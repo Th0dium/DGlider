@@ -1,58 +1,50 @@
-Glidra
-Glidra is an experimental mouse gesture engine built with AutoHotkey and Python, aiming to bring modular control and productivity boosts to your desktop through simple drag gestures.
+# Glidra
 
-🔧 Features (Planned / WIP)
-⚙️ Fully customizable mouse gestures per hotkey
+**Glidra** is a modular mouse gesture engine designed to enhance productivity through customizable directional gestures. Built with AutoHotkey and Python, it offers a flexible configuration system and aims to support GUI-based gesture editing.
 
-🖱️ Directional gesture recognition (Up / Down / Left / Right / Default)
+## Features
 
-🧠 Command mapping: key sequences or built-in functions (e.g., window snap)
+- Directional gesture recognition: Up / Down / Left / Right / Default
+- Per-hotkey gesture mapping
+- Trigger key sequences or built-in functions
+- Configurable via external `.json` files
+- GUI for editing gesture profiles (work in progress)
+- Designed with modularity in mind
 
-📁 Configurable via external .json files
+## Project Status
 
-🪟 GUI interface for gesture management (in progress)
+Glidra is in early development. The gesture engine is functional and supports external config files. A basic GUI is under development to manage gestures and enable dynamic script generation based on user-defined features.
 
-🧩 Modular design: plan to assemble custom scripts dynamically based on user-selected functions
+This project is built gradually as a personal side project and is not yet feature-complete.
 
-📌 Project Status
-Glidra is still in its early development stage. The core gesture engine is functional and script-based.
-We're currently working on:
+## Tech Stack
 
-Designing a minimal GUI to load and edit gesture configurations
+- AutoHotkey (core gesture engine)
+- Python (Tkinter-based GUI)
+- JSON (configuration format)
 
-Allowing plug-and-play function modules
+## Getting Started
 
-Preparing the project for GitHub showcase and portfolio use
+1. Clone this repository.
+2. Run `gestures.ahk` to activate the gesture engine.
+3. Press one of the defined hotkeys (e.g., Ctrl + Alt + 1), move the mouse in a direction, and trigger the assigned action.
 
-This is a side project, actively developed in free time. Feedback and suggestions are welcome.
+The GUI component is still under development and will be added in future commits.
 
-📦 Tech Stack
-AutoHotkey v1
+## Folder Structure (Planned)
 
-Python (Tkinter for GUI, future expansion to PyQt possible)
+Glidra/
+├── gestures.ahk # Core gesture engine
+├── config/
+│ └── gestures.json # Gesture mapping
+├── gui/
+│ └── main.py # GUI editor (WIP)
+└── README.md
 
-JSON for config structure
-
-📁 Folder Structure (Preview)
-css
+shell
 Sao chép
 Chỉnh sửa
-Glidra/
-│
-├── gestures.ahk            ; Core gesture engine
-├── config/
-│   └── gestures.json       ; Gesture mapping per hotkey
-├── gui/
-│   └── main.py             ; GUI for editing gestures (WIP)
-├── README.md
-└── ...
-🚀 Getting Started
-Clone the repo
 
-Run gestures.ahk
+## License
 
-Drag mouse with modifier key (e.g., Ctrl + Alt + 1) to trigger configured gestures
-(more setup details will be provided once GUI is ready)
-
-📄 License
-This project is open-source, under a permissive license (TBD). Use, modify, or contribute freely.
+To be determined.
