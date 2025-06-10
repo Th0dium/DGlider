@@ -1,6 +1,6 @@
-# Glidra
+# DGlider
 
-**Glidra** is a modular mouse gesture engine designed to enhance productivity through customizable directional gestures. Built with AutoHotkey and Python, it offers a flexible configuration system and aims to support GUI-based gesture editing.
+**DGlider** is a modular mouse gesture engine designed to enhance productivity through customizable directional gestures. Built with AutoHotkey and Python, it offers a flexible configuration system and aims to support GUI-based gesture editing.
 
 ## Features
 
@@ -13,7 +13,7 @@
 
 ## Project Status
 
-Glidra is in early development. The gesture engine is functional and supports external config files. A basic GUI is under development to manage gestures and enable dynamic script generation based on user-defined features.
+DGlider is in early development. The gesture engine is functional and supports external config files. A basic GUI is under development to manage gestures and enable dynamic script generation based on user-defined features.
 
 This project is built gradually as a personal side project and is not yet feature-complete.
 
