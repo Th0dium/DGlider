@@ -31,15 +31,6 @@ This project is built gradually as a personal side project and is not yet featur
 
 The GUI component is still under development and will be added in future commits.
 
-## Folder Structure (Planned)
-
-Glidra/
-├── gestures.ahk # Core gesture engine
-├── config/
-│ └── gestures.json # Gesture mapping
-├── gui/
-│ └── main.py # GUI editor (WIP)
-└── README.md
 
 shell
 Sao chép
