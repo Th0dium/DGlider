@@ -26,16 +26,9 @@ This project is built gradually as a personal side project and is not yet featur
 ## Getting Started
 
 1. Clone this repository.
-2. Run `gestures.ahk` to activate the gesture engine.
+2. Run `gestures v1.ahk` to activate the gesture engine.
 3. Press one of the defined hotkeys (e.g., Ctrl + Alt + 1), move the mouse in a direction, and trigger the assigned action.
 
 The GUI component is still under development and will be added in future commits.
 
 
-shell
-Sao chép
-Chỉnh sửa
-
-## License
-
-To be determined.
