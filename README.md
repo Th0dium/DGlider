@@ -20,7 +20,7 @@ This project is built gradually as a personal side project and is not yet featur
 ## Tech Stack
 
 - AutoHotkey (core gesture engine)
-- Python (Tkinter-based GUI)
+- Python (GUI)
 - JSON (configuration format)
 
 ## Getting Started
