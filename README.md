@@ -26,7 +26,7 @@ This project is built gradually as a personal side project and is not yet featur
 ## Getting Started
 
 1. Clone this repository.
-2. Install AHK
+2. Install AHK (v1)
 3. Run `GesturesV1.ahk` to activate the gesture engine.
 4. Press one of the defined hotkeys (e.g., Ctrl + Alt + 1), move the mouse in a direction, and trigger the assigned action.
 
