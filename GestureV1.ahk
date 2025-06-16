@@ -14,8 +14,8 @@ sendMap["^!1"] := { right: "{Esc}", 	left: "!+{Tab}",	down: "#d", 		up: "^!{Tab}
 sendMap["^!2"] := { right: "^v", 	left: "^x", 		down: "#v", 		up: "{Backspace}", 	default: "{Enter}" }
 sendMap["^!3"] := { right: "^c", 	left: "#{a}", 		down: "#{1}", 		up: "^{s}", 		default: "#{2}" }
 sendMap["^!4"] := { right: "^{y}", 	left: "", 		down: "#+s", 		up: "", 		default: "^{z}" }
-sendMap["^!5"] := { right: "", 		left: "", 		down: "^m^r", 		up: "^w", 		default: "!{Right}" }
-sendMap["^!6"] := { right: "^{Tab}", 	left: "^+{Tab}", 	down: "", 		up: "", 		default: "!{Left}" }
+sendMap["^!5"] := { right: "^+{Tab}", 	left: "", 		down: "^m^r", 		up: "^{w}", 		default: "!{Right}" }
+sendMap["^!6"] := { right: "^{Tab}", 	left: "", 		down: "^+{t}", 		up: "^{w}", 		default: "!{Left}" }
 sendMap["^!7"] := { right: "#{right}", 	left: "", 		down: "#{down}", 	up: "#{up}", 		default: "" }
 
 ;------------------------------------ Hotkeys ------------------------------------
