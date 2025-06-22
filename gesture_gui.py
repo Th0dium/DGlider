@@ -66,5 +66,6 @@ class GestureEditor:
 
 if __name__ == "__main__":
     root = tk.Tk()
+    root.geometry("600x400")  # Đặt kích thước cửa sổ (rộng x cao)
     app = GestureEditor(root)
     root.mainloop()

@@ -14,7 +14,7 @@ sendMap := {}
 sendMap["^!1"] := { right: "!+{Tab}", 	left: "{Esc}",		down: "#d", 		up: "^!{Tab}", 		default: "!{Tab}" }
 sendMap["^!2"] := { right: "^v", 	left: "^x", 		down: "#v", 		up: "{Backspace}", 	default: "{Enter}" }
 sendMap["^!3"] := { right: "^c", 	left: "#{a}", 		down: "#{1}", 		up: "{delete}", 	default: "#{2}" }
-sendMap["^!4"] := { right: "^{y}", 	left: "", 		down: "#+s", 		up: "fn:SaveClipboardImage", 		default: "^{z}" }
+sendMap["^!4"] := { right: "^{y}", 	left: "", 		down: "#+s", 		up: "fn:SCI", 		default: "^{z}" }
 sendMap["^!5"] := { right: "^+{Tab}", 	left: "", 		down: "^+{t}", 		up: "^{w}", 		default: "!{Right}" }
 sendMap["^!6"] := { right: "^{Tab}", 	left: "", 		down: "^{s}", 		up: "", 		default: "!{Left}" }
 sendMap["^!7"] := { right: "#{right}", 	left: "", 	down: "#{down}", 	up: "#{up}", 		default: "{f5}" }
@@ -66,7 +66,6 @@ HandleMouseAction(hotkey) {
 
     if (SubStr(action, 1, 3) = "fn:") {
         funcName := SubStr(action, 4)
-        ; Gọi hàm theo tên
         %funcName%()
     } else if (action != "") {
         Send, %action%
@@ -75,13 +74,11 @@ HandleMouseAction(hotkey) {
 
 ;----------------------------------- Functions -----------------------------------
 
-SaveClipboardImage() {
+SCI() { 
     FormatTime, timestamp,, yyyy-MM-dd_HH-mm-ss
     savePath := "C:\EpsteinBackupDrive\SavedPictures\" . timestamp . ".png"
     FileCreateDir, C:\EpsteinBackupDrive\SavedPictures
-
     StringReplace, savePathPS, savePath, \, \\, All
-
     psCommand =
     (
     Add-Type -AssemblyName System.Windows.Forms
@@ -95,10 +92,8 @@ SaveClipboardImage() {
     tmpPS := A_Temp "\clip_save.ps1"
     FileDelete, %tmpPS%
     FileAppend, %psCommand%, %tmpPS%
-
     RunWait, powershell.exe -STA -NoProfile -ExecutionPolicy Bypass -File "%tmpPS%",, Hide
-
     if !FileExist(savePath)
-        MsgBox, ❌ Clipboard không chứa ảnh hoặc PowerShell không thể truy cập ảnh.
+        MsgBox, Unable to detect File.
 }
 

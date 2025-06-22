@@ -1,16 +1,58 @@
 {
     "^!1": {
-      "up": "^!{Tab}",
+      "right": "!+{Tab}",
+      "left": "{Esc}",
       "down": "#d",
-      "left": "!+{Tab}",
-      "right": "{Esc}",
+      "up": "^!{Tab}",
       "default": "!{Tab}"
     },
     "^!2": {
-      "up": "{Backspace}",
-      "down": "#v",
-      "left": "^x",
       "right": "^v",
+      "left": "^x",
+      "down": "#v",
+      "up": "{Backspace}",
       "default": "{Enter}"
+    },
+    "^!3": {
+      "right": "^c",
+      "left": "#{a}",
+      "down": "#{1}",
+      "up": "{delete}",
+      "default": "#{2}"
+    },
+    "^!4": {
+      "right": "^{y}",
+      "left": "",
+      "down": "#+s",
+      "up": "fn:SCI",
+      "default": "^{z}"
+    },
+    "^!5": {
+      "right": "^+{Tab}",
+      "left": "",
+      "down": "^+{t}",
+      "up": "^{w}",
+      "default": "!{Right}"
+    },
+    "^!6": {
+      "right": "^{Tab}",
+      "left": "",
+      "down": "^{s}",
+      "up": "",
+      "default": "!{Left}"
+    },
+    "^!7": {
+      "right": "#{right}",
+      "left": "",
+      "down": "#{down}",
+      "up": "#{up}",
+      "default": "{f5}"
+    },
+    "^!8": {
+      "right": "",
+      "left": "",
+      "down": "",
+      "up": "",
+      "default": ""
     }
   }
