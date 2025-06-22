@@ -1,0 +1,38 @@
+20250622101547 - Hotkey: ^!2 | dx: 790 | dy: -11
+20250622101547 - Action: ^v
+20250622101547 - Send: ^v
+20250622101605 - Hotkey: ^!2 | dx: 440 | dy: 13
+20250622101605 - Action: ^v
+20250622101605 - Send: ^v
+20250622101608 - Hotkey: ^!2 | dx: 4 | dy: -131
+20250622101608 - Action: {Backspace}
+20250622101608 - Send: {Backspace}
+20250622101610 - Hotkey: ^!2 | dx: 0 | dy: 0
+20250622101610 - Action: {Enter}
+20250622101610 - Send: {Enter}
+20250622101634 - Hotkey: ^!4 | dx: -701 | dy: -85
+20250622101634 - Action: 
+20250622101637 - Hotkey: ^!2 | dx: 62 | dy: -161
+20250622101637 - Action: {Backspace}
+20250622101637 - Send: {Backspace}
+20250622101647 - Hotkey: ^!3 | dx: -360 | dy: 50
+20250622101647 - Action: #{a}
+20250622101647 - Send: #{a}
+20250622101650 - Hotkey: ^!4 | dx: -350 | dy: 53
+20250622101650 - Action: abc
+20250622101650 - Send: abc
+20250622101651 - Hotkey: ^!4 | dx: -463 | dy: 14
+20250622101651 - Action: abc
+20250622101651 - Send: abc
+20250622101654 - Hotkey: ^!2 | dx: -6 | dy: -129
+20250622101654 - Action: {Backspace}
+20250622101654 - Send: {Backspace}
+20250622101654 - Hotkey: ^!2 | dx: 43 | dy: -127
+20250622101654 - Action: {Backspace}
+20250622101654 - Send: {Backspace}
+20250622101654 - Hotkey: ^!2 | dx: 63 | dy: -180
+20250622101654 - Action: {Backspace}
+20250622101654 - Send: {Backspace}
+20250622101656 - Hotkey: ^!2 | dx: 25 | dy: -118
+20250622101656 - Action: {Backspace}
+20250622101656 - Send: {Backspace}

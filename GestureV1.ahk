@@ -10,16 +10,6 @@ SysGet, screenHeight, 79
 
 MoveThreshold := 40 ; Ngưỡng kéo chuột    
 
-sendMap := {}
-sendMap["^!1"] := { right: "!+{Tab}", 	left: "{Esc}",		down: "#d", 		up: "^!{Tab}", 		default: "!{Tab}" }
-sendMap["^!2"] := { right: "^v", 	left: "^x", 		down: "#v", 		up: "{Backspace}", 	default: "{Enter}" }
-sendMap["^!3"] := { right: "^c", 	left: "#{a}", 		down: "#{1}", 		up: "{delete}", 	default: "#{2}" }
-sendMap["^!4"] := { right: "^{y}", 	left: "", 		down: "#+s", 		up: "fn:SCI", 		default: "^{z}" }
-sendMap["^!5"] := { right: "^+{Tab}", 	left: "", 		down: "^+{t}", 		up: "^{w}", 		default: "!{Right}" }
-sendMap["^!6"] := { right: "^{Tab}", 	left: "", 		down: "^{s}", 		up: "", 		default: "!{Left}" }
-sendMap["^!7"] := { right: "#{right}", 	left: "", 	down: "#{down}", 	up: "#{up}", 		default: "{f5}" }
-sendMap["^!8"] := { right: "",            left: "",    down: "",            up: "",              default: "{mbutton}" }
-
 ;------------------------------------ Hotkeys ------------------------------------
 
 
@@ -36,8 +26,13 @@ sendMap["^!8"] := { right: "",            left: "",    down: "",            up: 
 
 ;--------------------------------- Mouse Tracking --------------------------------
 
+getAction(hotkey, direction) {
+    IniRead, value, C:\EpsteinBackupDrive\SkynetDatabase\DGlider\gesture_config.ini, Hotkey_%hotkey%, %direction%, 
+    return value
+}
+
 HandleMouseAction(hotkey) {
-    global sendMap, MoveThreshold
+    global MoveThreshold
     MouseGetPos, x0, y0
     StringTrimLeft, key, hotkey, 2
     KeyWait, %key%
@@ -46,28 +41,33 @@ HandleMouseAction(hotkey) {
     dx := x1 - x0
     dy := y1 - y0
 
+    logFile := "C:\EpsteinBackupDrive\SkynetDatabase\DGlider\gesture_log.txt"
+    FileAppend, %A_Now% - Hotkey: %hotkey% | dx: %dx% | dy: %dy%`n, %logFile%
+
     if (Abs(dx) > Abs(dy)) {
         if (dx > MoveThreshold)
-            action := sendMap[hotkey].right
+            action := getAction(hotkey, "right")
         else if (dx < -MoveThreshold)
-            action := sendMap[hotkey].left
+            action := getAction(hotkey, "left")
         else
-            action := sendMap[hotkey].default
+            action := getAction(hotkey, "default")
     } else {
         if (dy > MoveThreshold)
-            action := sendMap[hotkey].down
+            action := getAction(hotkey, "down")
         else if (dy < -MoveThreshold)
-            action := sendMap[hotkey].up
+            action := getAction(hotkey, "up")
         else
-            action := sendMap[hotkey].default
+            action := getAction(hotkey, "default")
     }
 
-    ;------------------------------------ Fn Call -----------------------------------
+    FileAppend, %A_Now% - Action: %action%`n, %logFile%
 
     if (SubStr(action, 1, 3) = "fn:") {
         funcName := SubStr(action, 4)
+        FileAppend, %A_Now% - Call function: %funcName%`n, %logFile%
         %funcName%()
     } else if (action != "") {
+        FileAppend, %A_Now% - Send: %action%`n, %logFile%
         Send, %action%
     }
 }
