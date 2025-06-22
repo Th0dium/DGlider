@@ -5,13 +5,7 @@
 ;cảm biến màn hình (MoveWin)
 SysGet, screenWidth, 78
 SysGet, screenHeight, 79
-
-;------------------------------------ Mapping ------------------------------------
-
-MoveThreshold := 40 ; Ngưỡng kéo chuột    
-
-;------------------------------------ Hotkeys ------------------------------------
-
+MoveThreshold := 40 ; Ngưỡng kéo chuột   
 
 ;------------------------------------- Links -------------------------------------
 
@@ -41,7 +35,11 @@ HandleMouseAction(hotkey) {
     dx := x1 - x0
     dy := y1 - y0
 
-    logFile := "C:\EpsteinBackupDrive\SkynetDatabase\DGlider\gesture_log.txt"
+    logDir := A_Desktop "\Log"
+    IfNotExist, %logDir%
+        FileCreateDir, %logDir%
+    logFile := logDir "\gesture_log.txt"
+
     FileAppend, %A_Now% - Hotkey: %hotkey% | dx: %dx% | dy: %dy%`n, %logFile%
 
     if (Abs(dx) > Abs(dy)) {
