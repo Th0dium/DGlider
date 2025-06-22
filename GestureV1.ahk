@@ -21,7 +21,7 @@ MoveThreshold := 40 ; Ngưỡng kéo chuột
 ;--------------------------------- Mouse Tracking --------------------------------
 
 getAction(hotkey, direction) {
-    IniRead, value, C:\EpsteinBackupDrive\SkynetDatabase\DGlider\gesture_config.ini, Hotkey_%hotkey%, %direction%, 
+    IniRead, value, %A_ScriptDir%\gesture_config.ini, Hotkey_%hotkey%, %direction%,
     return value
 }
 
