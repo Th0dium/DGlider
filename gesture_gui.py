@@ -354,3 +354,166 @@ class DGliderGUI:
 
         # Configure column weights
         gesture_frame.columnconfigure(1, weight=1)
+
+    # Event handlers and utility methods
+    def on_mouse_button_change(self, event=None):
+        """Handle mouse button selection change"""
+        # This could be used to filter configurations by mouse button in the future
+        pass
+
+    def on_category_select(self, event=None):
+        """Handle category selection in hotkey library"""
+        selection = self.category_listbox.curselection()
+        if not selection:
+            return
+
+        category = self.category_listbox.get(selection[0])
+
+        # Clear and populate hotkey tree
+        for item in self.hotkey_tree.get_children():
+            self.hotkey_tree.delete(item)
+
+        if category in self.hotkey_library:
+            for name, hotkey in self.hotkey_library[category].items():
+                self.hotkey_tree.insert('', 'end', values=(name, hotkey))
+
+    def browse_hotkey_library(self, hotkey, direction):
+        """Open hotkey library browser for specific gesture"""
+        dialog = HotkeyBrowserDialog(self.root, self.hotkey_library)
+        result = dialog.show()
+
+        if result:
+            if hasattr(self, 'gesture_entries') and hotkey in self.gesture_entries:
+                self.gesture_entries[hotkey][direction].set(result)
+                if self.auto_save_var.get():
+                    self.save_current_config()
+
+    def add_hotkey(self):
+        """Add a new hotkey configuration"""
+        dialog = HotkeyInputDialog(self.root)
+        new_hotkey = dialog.show()
+
+        if new_hotkey and new_hotkey not in self.config_data:
+            self.config_data[new_hotkey] = {
+                "up": "", "down": "", "left": "", "right": "", "default": ""
+            }
+            self.refresh_gesture_ui()
+            self.refresh_preview()
+
+    def remove_hotkey(self):
+        """Remove selected hotkey configuration"""
+        # Simple implementation - could be enhanced with selection UI
+        if self.config_data:
+            hotkeys = list(self.config_data.keys())
+            if hotkeys:
+                # For now, remove the last one - could be enhanced with proper selection
+                last_hotkey = hotkeys[-1]
+                result = messagebox.askyesno("Confirm Delete",
+                                           f"Delete hotkey '{last_hotkey}'?")
+                if result:
+                    del self.config_data[last_hotkey]
+                    self.refresh_gesture_ui()
+                    self.refresh_preview()
+
+    def add_category(self):
+        """Add new category to hotkey library"""
+        dialog = CategoryInputDialog(self.root)
+        new_category = dialog.show()
+
+        if new_category and new_category not in self.hotkey_library:
+            self.hotkey_library[new_category] = {}
+            self.category_listbox.insert(tk.END, new_category)
+
+    def add_hotkey_to_library(self):
+        """Add new hotkey to selected category"""
+        selection = self.category_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("No Category", "Please select a category first.")
+            return
+
+        category = self.category_listbox.get(selection[0])
+        dialog = HotkeyDefinitionDialog(self.root)
+        result = dialog.show()
+
+        if result:
+            name, hotkey = result
+            self.hotkey_library[category][name] = hotkey
+            self.on_category_select()  # Refresh the tree
+
+    def edit_hotkey(self):
+        """Edit selected hotkey in library"""
+        selection = self.hotkey_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a hotkey to edit.")
+            return
+
+        item = self.hotkey_tree.item(selection[0])
+        name, hotkey = item['values']
+
+        dialog = HotkeyDefinitionDialog(self.root, name, hotkey)
+        result = dialog.show()
+
+        if result:
+            new_name, new_hotkey = result
+            # Update in library
+            category_selection = self.category_listbox.curselection()
+            if category_selection:
+                category = self.category_listbox.get(category_selection[0])
+                if name in self.hotkey_library[category]:
+                    del self.hotkey_library[category][name]
+                self.hotkey_library[category][new_name] = new_hotkey
+                self.on_category_select()  # Refresh the tree
+
+    def delete_hotkey(self):
+        """Delete selected hotkey from library"""
+        selection = self.hotkey_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a hotkey to delete.")
+            return
+
+        item = self.hotkey_tree.item(selection[0])
+        name = item['values'][0]
+
+        result = messagebox.askyesno("Confirm Delete", f"Delete hotkey '{name}'?")
+        if result:
+            category_selection = self.category_listbox.curselection()
+            if category_selection:
+                category = self.category_listbox.get(category_selection[0])
+                if name in self.hotkey_library[category]:
+                    del self.hotkey_library[category][name]
+                    self.on_category_select()  # Refresh the tree
+
+    def test_gesture(self):
+        """Test gesture functionality"""
+        messagebox.showinfo("Test Gesture",
+                          "Gesture testing functionality would be implemented here.\n"
+                          "This could include simulating mouse movements and testing actions.")
+
+    def view_logs(self):
+        """View gesture logs"""
+        log_path = os.path.expanduser("~/Desktop/Log/gesture_log.txt")
+        if os.path.exists(log_path):
+            LogViewerDialog(self.root, log_path).show()
+        else:
+            messagebox.showinfo("No Logs", "No log file found at the expected location.")
+
+    def clear_logs(self):
+        """Clear gesture logs"""
+        log_path = os.path.expanduser("~/Desktop/Log/gesture_log.txt")
+        if os.path.exists(log_path):
+            result = messagebox.askyesno("Clear Logs", "Are you sure you want to clear all logs?")
+            if result:
+                try:
+                    with open(log_path, 'w') as f:
+                        f.write(f"Log cleared at {datetime.now()}\n")
+                    messagebox.showinfo("Success", "Logs cleared successfully.")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to clear logs: {e}")
+        else:
+            messagebox.showinfo("No Logs", "No log file found to clear.")
+
+    def refresh_preview(self):
+        """Refresh the configuration preview"""
+        preview_text = self.generate_preview_text()
+        self.preview_text.delete(1.0, tk.END)
+        self.preview_text.insert(1.0, preview_text)
