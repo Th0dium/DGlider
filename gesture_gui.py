@@ -517,3 +517,564 @@ class DGliderGUI:
         preview_text = self.generate_preview_text()
         self.preview_text.delete(1.0, tk.END)
         self.preview_text.insert(1.0, preview_text)
+
+    def generate_preview_text(self):
+        """Generate preview text for current configuration"""
+        lines = []
+        lines.append("=== DGlider Configuration Preview ===\n")
+        lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        lines.append(f"Mouse Button: {self.selected_mouse_button.get()}")
+        lines.append(f"Gesture Threshold: {self.gesture_threshold.get()} pixels\n")
+
+        lines.append("=== Hotkey Mappings ===")
+        for hotkey, directions in self.config_data.items():
+            lines.append(f"\nHotkey: {hotkey}")
+            for direction, action in directions.items():
+                if action:
+                    lines.append(f"  {direction.ljust(8)}: {action}")
+                else:
+                    lines.append(f"  {direction.ljust(8)}: (not set)")
+
+        return "\n".join(lines)
+
+    # File operations
+    def new_config(self):
+        """Create new configuration"""
+        if self.config_data:
+            result = messagebox.askyesno("New Config",
+                                       "Current configuration will be lost. Continue?")
+            if not result:
+                return
+        self.load_default_config()
+        self.current_config_file = None
+        self.current_config_label.config(text="Untitled")
+
+    def load_config(self):
+        """Load configuration from file"""
+        file_path = filedialog.askopenfilename(
+            title="Load Configuration",
+            filetypes=[("JSON files", "*.json"), ("INI files", "*.ini"), ("All files", "*.*")]
+        )
+
+        if not file_path:
+            return
+
+        try:
+            if file_path.endswith('.json'):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    self.config_data = json.load(f)
+            elif file_path.endswith('.ini'):
+                config = configparser.ConfigParser()
+                config.read(file_path)
+                self.config_data = {}
+                for section in config.sections():
+                    if section.startswith('Hotkey_'):
+                        hotkey = section[7:]  # Remove 'Hotkey_' prefix
+                        self.config_data[hotkey] = dict(config[section])
+
+            self.current_config_file = file_path
+            self.current_config_label.config(text=os.path.basename(file_path))
+            self.refresh_gesture_ui()
+            self.refresh_preview()
+            messagebox.showinfo("Success", "Configuration loaded successfully.")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load configuration:\n{e}")
+
+    def save_config(self):
+        """Save current configuration"""
+        if self.current_config_file:
+            self.save_to_file(self.current_config_file)
+        else:
+            self.save_config_as()
+
+    def save_config_as(self):
+        """Save configuration to new file"""
+        file_path = filedialog.asksaveasfilename(
+            title="Save Configuration",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("INI files", "*.ini")]
+        )
+
+        if file_path:
+            self.save_to_file(file_path)
+            self.current_config_file = file_path
+            self.current_config_label.config(text=os.path.basename(file_path))
+
+    def save_to_file(self, file_path):
+        """Save configuration to specified file"""
+        try:
+            # Update config data from UI
+            self.update_config_from_ui()
+
+            if file_path.endswith('.json'):
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(self.config_data, f, indent=4)
+            elif file_path.endswith('.ini'):
+                config = configparser.ConfigParser()
+                for hotkey, directions in self.config_data.items():
+                    section_name = f'Hotkey_{hotkey}'
+                    config[section_name] = directions
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    config.write(f)
+
+            messagebox.showinfo("Success", "Configuration saved successfully.")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save configuration:\n{e}")
+
+    def save_current_config(self):
+        """Save current configuration if auto-save is enabled"""
+        if self.auto_save_var.get() and self.current_config_file:
+            self.save_to_file(self.current_config_file)
+
+    def update_config_from_ui(self):
+        """Update config data from UI entries"""
+        if hasattr(self, 'gesture_entries'):
+            for hotkey, directions in self.gesture_entries.items():
+                if hotkey not in self.config_data:
+                    self.config_data[hotkey] = {}
+                for direction, var in directions.items():
+                    self.config_data[hotkey][direction] = var.get()
+
+    def export_to_ahk(self):
+        """Export configuration to AutoHotkey script"""
+        file_path = filedialog.asksaveasfilename(
+            title="Export to AutoHotkey",
+            defaultextension=".ahk",
+            filetypes=[("AutoHotkey files", "*.ahk")]
+        )
+
+        if not file_path:
+            return
+
+        try:
+            self.update_config_from_ui()
+            ahk_content = self.generate_ahk_script()
+
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(ahk_content)
+
+            messagebox.showinfo("Success", f"AutoHotkey script exported to:\n{file_path}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export AHK script:\n{e}")
+
+    def export_to_json(self):
+        """Export configuration to JSON"""
+        file_path = filedialog.asksaveasfilename(
+            title="Export to JSON",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json")]
+        )
+
+        if file_path:
+            self.save_to_file(file_path)
+
+    def export_to_ini(self):
+        """Export configuration to INI"""
+        file_path = filedialog.asksaveasfilename(
+            title="Export to INI",
+            defaultextension=".ini",
+            filetypes=[("INI files", "*.ini")]
+        )
+
+        if file_path:
+            self.save_to_file(file_path)
+
+    def generate_ahk_script(self):
+        """Generate AutoHotkey script from current configuration"""
+        lines = []
+        lines.append(";=== Generated by DGlider GUI ===")
+        lines.append(f";Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append("#SingleInstance Force")
+        lines.append("")
+        lines.append(";=== Variables ===")
+        lines.append("SysGet, screenWidth, 78")
+        lines.append("SysGet, screenHeight, 79")
+        lines.append(f"MoveThreshold := {self.gesture_threshold.get()}")
+        lines.append("")
+        lines.append(";=== Hotkey Bindings ===")
+
+        for hotkey in self.config_data.keys():
+            lines.append(f'{hotkey}::HandleMouseAction("{hotkey}")')
+
+        lines.append("")
+        lines.append(";=== Core Functions ===")
+        lines.append("getAction(hotkey, direction) {")
+        lines.append("    IniRead, value, %A_ScriptDir%\\gesture_config.ini, Hotkey_%hotkey%, %direction%,")
+        lines.append("    return value")
+        lines.append("}")
+        lines.append("")
+
+        # Add the main handler function (simplified version)
+        lines.append("HandleMouseAction(hotkey) {")
+        lines.append("    global MoveThreshold")
+        lines.append("    MouseGetPos, x0, y0")
+        lines.append("    StringTrimLeft, key, hotkey, 2")
+        lines.append("    KeyWait, %key%")
+        lines.append("    MouseGetPos, x1, y1")
+        lines.append("    dx := x1 - x0")
+        lines.append("    dy := y1 - y0")
+        lines.append("")
+        lines.append("    if (Abs(dx) > Abs(dy)) {")
+        lines.append("        if (dx > MoveThreshold)")
+        lines.append("            action := getAction(hotkey, \"right\")")
+        lines.append("        else if (dx < -MoveThreshold)")
+        lines.append("            action := getAction(hotkey, \"left\")")
+        lines.append("        else")
+        lines.append("            action := getAction(hotkey, \"default\")")
+        lines.append("    } else {")
+        lines.append("        if (dy > MoveThreshold)")
+        lines.append("            action := getAction(hotkey, \"down\")")
+        lines.append("        else if (dy < -MoveThreshold)")
+        lines.append("            action := getAction(hotkey, \"up\")")
+        lines.append("        else")
+        lines.append("            action := getAction(hotkey, \"default\")")
+        lines.append("    }")
+        lines.append("")
+        lines.append("    if (SubStr(action, 1, 3) = \"fn:\") {")
+        lines.append("        funcName := SubStr(action, 4)")
+        lines.append("        %funcName%()")
+        lines.append("    } else if (action != \"\") {")
+        lines.append("        Send, %action%")
+        lines.append("    }")
+        lines.append("}")
+
+        return "\n".join(lines)
+
+    def show_about(self):
+        """Show about dialog"""
+        about_text = """DGlider - Advanced Gesture Configuration
+
+Version: 2.0
+Developed by: DGlider Team
+
+A modular mouse gesture engine that enhances productivity
+through fully customizable directional gestures.
+
+Built with AutoHotkey and Python.
+"""
+        messagebox.showinfo("About DGlider", about_text)
+
+    def show_hotkey_reference(self):
+        """Show hotkey reference dialog"""
+        HotkeyReferenceDialog(self.root).show()
+
+
+# Dialog Classes
+class HotkeyBrowserDialog:
+    def __init__(self, parent, hotkey_library):
+        self.parent = parent
+        self.hotkey_library = hotkey_library
+        self.result = None
+
+    def show(self):
+        self.dialog = tk.Toplevel(self.parent)
+        self.dialog.title("Browse Hotkey Library")
+        self.dialog.geometry("500x400")
+        self.dialog.transient(self.parent)
+        self.dialog.grab_set()
+
+        # Category selection
+        ttk.Label(self.dialog, text="Category:").pack(pady=5)
+        self.category_var = tk.StringVar()
+        category_combo = ttk.Combobox(self.dialog, textvariable=self.category_var,
+                                     values=list(self.hotkey_library.keys()), state='readonly')
+        category_combo.pack(pady=5)
+        category_combo.bind('<<ComboboxSelected>>', self.on_category_change)
+
+        # Hotkey list
+        ttk.Label(self.dialog, text="Hotkeys:").pack(pady=(10,5))
+
+        frame = ttk.Frame(self.dialog)
+        frame.pack(fill='both', expand=True, padx=10, pady=5)
+
+        self.hotkey_listbox = tk.Listbox(frame)
+        scrollbar = ttk.Scrollbar(frame, orient='vertical', command=self.hotkey_listbox.yview)
+        self.hotkey_listbox.configure(yscrollcommand=scrollbar.set)
+
+        self.hotkey_listbox.pack(side='left', fill='both', expand=True)
+        scrollbar.pack(side='right', fill='y')
+
+        # Buttons
+        button_frame = ttk.Frame(self.dialog)
+        button_frame.pack(fill='x', padx=10, pady=10)
+
+        ttk.Button(button_frame, text="Select", command=self.select_hotkey).pack(side='right', padx=5)
+        ttk.Button(button_frame, text="Cancel", command=self.dialog.destroy).pack(side='right')
+
+        self.dialog.wait_window()
+        return self.result
+
+    def on_category_change(self, event=None):
+        category = self.category_var.get()
+        self.hotkey_listbox.delete(0, tk.END)
+
+        if category in self.hotkey_library:
+            for name, hotkey in self.hotkey_library[category].items():
+                self.hotkey_listbox.insert(tk.END, f"{name} ({hotkey})")
+
+    def select_hotkey(self):
+        selection = self.hotkey_listbox.curselection()
+        if selection:
+            item = self.hotkey_listbox.get(selection[0])
+            # Extract hotkey from "name (hotkey)" format
+            if '(' in item and ')' in item:
+                self.result = item.split('(')[1].rstrip(')')
+            self.dialog.destroy()
+
+
+class HotkeyInputDialog:
+    def __init__(self, parent):
+        self.parent = parent
+        self.result = None
+
+    def show(self):
+        self.dialog = tk.Toplevel(self.parent)
+        self.dialog.title("Add Hotkey")
+        self.dialog.geometry("300x150")
+        self.dialog.transient(self.parent)
+        self.dialog.grab_set()
+
+        ttk.Label(self.dialog, text="Enter hotkey combination:").pack(pady=10)
+
+        self.entry_var = tk.StringVar()
+        entry = ttk.Entry(self.dialog, textvariable=self.entry_var, width=30)
+        entry.pack(pady=5)
+        entry.focus()
+
+        ttk.Label(self.dialog, text="Example: ^!1 (Ctrl+Alt+1)").pack(pady=5)
+
+        button_frame = ttk.Frame(self.dialog)
+        button_frame.pack(pady=10)
+
+        ttk.Button(button_frame, text="OK", command=self.ok_clicked).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Cancel", command=self.dialog.destroy).pack(side='left')
+
+        self.dialog.bind('<Return>', lambda e: self.ok_clicked())
+        self.dialog.wait_window()
+        return self.result
+
+    def ok_clicked(self):
+        self.result = self.entry_var.get().strip()
+        self.dialog.destroy()
+
+
+class CategoryInputDialog:
+    def __init__(self, parent):
+        self.parent = parent
+        self.result = None
+
+    def show(self):
+        self.dialog = tk.Toplevel(self.parent)
+        self.dialog.title("Add Category")
+        self.dialog.geometry("300x150")
+        self.dialog.transient(self.parent)
+        self.dialog.grab_set()
+
+        ttk.Label(self.dialog, text="Enter category name:").pack(pady=10)
+
+        self.entry_var = tk.StringVar()
+        entry = ttk.Entry(self.dialog, textvariable=self.entry_var, width=30)
+        entry.pack(pady=5)
+        entry.focus()
+
+        button_frame = ttk.Frame(self.dialog)
+        button_frame.pack(pady=10)
+
+        ttk.Button(button_frame, text="OK", command=self.ok_clicked).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Cancel", command=self.dialog.destroy).pack(side='left')
+
+        self.dialog.bind('<Return>', lambda e: self.ok_clicked())
+        self.dialog.wait_window()
+        return self.result
+
+    def ok_clicked(self):
+        self.result = self.entry_var.get().strip()
+        self.dialog.destroy()
+
+
+class HotkeyDefinitionDialog:
+    def __init__(self, parent, name="", hotkey=""):
+        self.parent = parent
+        self.result = None
+        self.initial_name = name
+        self.initial_hotkey = hotkey
+
+    def show(self):
+        self.dialog = tk.Toplevel(self.parent)
+        self.dialog.title("Define Hotkey")
+        self.dialog.geometry("400x200")
+        self.dialog.transient(self.parent)
+        self.dialog.grab_set()
+
+        # Name field
+        ttk.Label(self.dialog, text="Action Name:").pack(pady=5)
+        self.name_var = tk.StringVar(value=self.initial_name)
+        name_entry = ttk.Entry(self.dialog, textvariable=self.name_var, width=40)
+        name_entry.pack(pady=5)
+
+        # Hotkey field
+        ttk.Label(self.dialog, text="Hotkey/Function:").pack(pady=5)
+        self.hotkey_var = tk.StringVar(value=self.initial_hotkey)
+        hotkey_entry = ttk.Entry(self.dialog, textvariable=self.hotkey_var, width=40)
+        hotkey_entry.pack(pady=5)
+
+        # Help text
+        help_text = "Examples:\n^c (Ctrl+C), !{Tab} (Alt+Tab), fn:SCI (Function call)"
+        ttk.Label(self.dialog, text=help_text, foreground='gray').pack(pady=5)
+
+        # Buttons
+        button_frame = ttk.Frame(self.dialog)
+        button_frame.pack(pady=10)
+
+        ttk.Button(button_frame, text="OK", command=self.ok_clicked).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Cancel", command=self.dialog.destroy).pack(side='left')
+
+        name_entry.focus()
+        self.dialog.bind('<Return>', lambda e: self.ok_clicked())
+        self.dialog.wait_window()
+        return self.result
+
+    def ok_clicked(self):
+        name = self.name_var.get().strip()
+        hotkey = self.hotkey_var.get().strip()
+        if name and hotkey:
+            self.result = (name, hotkey)
+        self.dialog.destroy()
+
+
+class LogViewerDialog:
+    def __init__(self, parent, log_path):
+        self.parent = parent
+        self.log_path = log_path
+
+    def show(self):
+        self.dialog = tk.Toplevel(self.parent)
+        self.dialog.title("Gesture Logs")
+        self.dialog.geometry("800x600")
+        self.dialog.transient(self.parent)
+
+        # Text area
+        text_frame = ttk.Frame(self.dialog)
+        text_frame.pack(fill='both', expand=True, padx=10, pady=10)
+
+        self.text_area = ScrolledText(text_frame, wrap=tk.WORD)
+        self.text_area.pack(fill='both', expand=True)
+
+        # Load and display log content
+        try:
+            with open(self.log_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                self.text_area.insert(1.0, content)
+        except Exception as e:
+            self.text_area.insert(1.0, f"Error reading log file: {e}")
+
+        # Buttons
+        button_frame = ttk.Frame(self.dialog)
+        button_frame.pack(fill='x', padx=10, pady=5)
+
+        ttk.Button(button_frame, text="Refresh", command=self.refresh_logs).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Close", command=self.dialog.destroy).pack(side='right')
+
+    def refresh_logs(self):
+        self.text_area.delete(1.0, tk.END)
+        try:
+            with open(self.log_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                self.text_area.insert(1.0, content)
+        except Exception as e:
+            self.text_area.insert(1.0, f"Error reading log file: {e}")
+
+
+class HotkeyReferenceDialog:
+    def __init__(self, parent):
+        self.parent = parent
+
+    def show(self):
+        self.dialog = tk.Toplevel(self.parent)
+        self.dialog.title("Hotkey Reference")
+        self.dialog.geometry("600x500")
+        self.dialog.transient(self.parent)
+
+        # Create notebook for different reference sections
+        notebook = ttk.Notebook(self.dialog)
+        notebook.pack(fill='both', expand=True, padx=10, pady=10)
+
+        # AutoHotkey syntax tab
+        ahk_frame = ttk.Frame(notebook)
+        notebook.add(ahk_frame, text="AutoHotkey Syntax")
+
+        ahk_text = ScrolledText(ahk_frame, wrap=tk.WORD)
+        ahk_text.pack(fill='both', expand=True, padx=5, pady=5)
+
+        ahk_reference = """AutoHotkey Hotkey Reference:
+
+Modifier Keys:
+^ = Ctrl
+! = Alt
++ = Shift
+# = Windows Key
+
+Special Keys:
+{Tab} = Tab key
+{Enter} = Enter key
+{Esc} = Escape key
+{Space} = Space bar
+{F1}-{F12} = Function keys
+{Up}, {Down}, {Left}, {Right} = Arrow keys
+{Home}, {End}, {PgUp}, {PgDn} = Navigation keys
+
+Examples:
+^c = Ctrl+C (Copy)
+!{Tab} = Alt+Tab (Switch windows)
+^+{Esc} = Ctrl+Shift+Esc (Task Manager)
+{LWin}d = Windows+D (Show desktop)
+
+Function Calls:
+fn:FunctionName = Call custom function
+Example: fn:SCI = Call SCI() function
+"""
+        ahk_text.insert(1.0, ahk_reference)
+        ahk_text.config(state='disabled')
+
+        # Gesture directions tab
+        gesture_frame = ttk.Frame(notebook)
+        notebook.add(gesture_frame, text="Gesture Directions")
+
+        gesture_text = ScrolledText(gesture_frame, wrap=tk.WORD)
+        gesture_text.pack(fill='both', expand=True, padx=5, pady=5)
+
+        gesture_reference = """Gesture Directions:
+
+Available Directions:
+↑ Up = Move mouse upward while holding hotkey
+↓ Down = Move mouse downward while holding hotkey
+← Left = Move mouse left while holding hotkey
+→ Right = Move mouse right while holding hotkey
+● Default = Release hotkey without moving mouse
+
+How to Use:
+1. Press and hold a configured hotkey (e.g., Ctrl+Alt+1)
+2. Move mouse in desired direction
+3. Release the hotkey
+4. The corresponding action will be executed
+
+Threshold:
+The gesture threshold determines how far you need to move
+the mouse before it registers as a directional gesture.
+Default is 40 pixels.
+"""
+        gesture_text.insert(1.0, gesture_reference)
+        gesture_text.config(state='disabled')
+
+        # Close button
+        ttk.Button(self.dialog, text="Close", command=self.dialog.destroy).pack(pady=10)
+
+
+# Main application entry point
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = DGliderGUI(root)
+    root.mainloop()
