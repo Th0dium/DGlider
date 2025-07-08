@@ -31,7 +31,7 @@ Imagine your mouse as a gateway to a temple. Each mouse button represents a diff
 
 ## Project Status
 
-DGlider now features a complete GUI interface for configuration management. The gesture engine is fully functional with comprehensive logging and multiple export options.
+DGlider now features a GUI interface for configuration management. The gesture engine is somewhat functional with logging and multiple export options.
 
 ## Tech Stack
 
@@ -44,11 +44,11 @@ DGlider now features a complete GUI interface for configuration management. The 
 
 ### Prerequisites
 1. **AutoHotkey v1**: Download from [autohotkey.com](https://autohotkey.com)
-2. **Python 3.x**: Required for GUI (usually pre-installed on modern systems)
+2. **Python 3.x**
 
 ### Quick Start
 1. **Clone this repository**
-2. **Launch the GUI**: Run `python gesture_gui.py`
+2. **Launch the GUI**: Run the .bat file
 3. **Configure gestures**: Use the GUI to set up your preferred shortcuts
 4. **Export configuration**: Generate AutoHotkey script or save as JSON/INI
 5. **Run the engine**: Execute `GestureV1.ahk` to activate gestures
@@ -77,12 +77,12 @@ DGlider now features a complete GUI interface for configuration management. The 
 - Save as JSON or INI format
 
 ### Example Usage
-1. Press and hold `Ctrl+Alt+1`
+1. Press and hold `Ctrl+Alt+1` (you can assign a mouse button)
 2. Move mouse **up** → Copy (Ctrl+C)
 3. Move mouse **down** → Paste (Ctrl+V)
 4. Move mouse **left** → Undo (Ctrl+Z)
 5. Move mouse **right** → Redo (Ctrl+Y)
-6. Release without moving → Screenshot function
+6. Release without moving → Screenshot (Win+Shift+S)
 
 ## Configuration Files
 
