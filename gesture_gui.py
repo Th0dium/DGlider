@@ -66,6 +66,7 @@ class DGliderGUI:
             },
             "Functions": {
                 "Screenshot to Clipboard": "fn:SCI",
+                "Type Text": "fn:TypeText",
                 "Custom Function 1": "fn:CustomFunc1",
                 "Custom Function 2": "fn:CustomFunc2"
             }
@@ -738,6 +739,25 @@ class DGliderGUI:
         lines.append("        %funcName%()")
         lines.append("    } else if (action != \"\") {")
         lines.append("        Send, %action%")
+        lines.append("    }")
+        lines.append("}")
+        lines.append("")
+        lines.append(";=== Custom Functions ===")
+        lines.append("TypeText() {")
+        lines.append("    ; Hiển thị hộp thoại để người dùng nhập text")
+        lines.append("    InputBox, userText, Type Text, Enter text to type:, , 400, 150")
+        lines.append("    ")
+        lines.append("    ; Kiểm tra nếu người dùng không hủy và có nhập text")
+        lines.append("    if (ErrorLevel = 0 && userText != \"\") {")
+        lines.append("        ; Ghi log")
+        lines.append("        logDir := A_Desktop \"\\Log\"")
+        lines.append("        IfNotExist, %logDir%")
+        lines.append("            FileCreateDir, %logDir%")
+        lines.append("        logFile := logDir \"\\gesture_log.txt\"")
+        lines.append("        FileAppend, %A_Now% - TypeText function called - Text: %userText%`n, %logFile%")
+        lines.append("        ")
+        lines.append("        ; Gửi text ra bàn phím")
+        lines.append("        SendRaw, %userText%")
         lines.append("    }")
         lines.append("}")
 

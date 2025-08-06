@@ -11,12 +11,16 @@ MoveThreshold := 40 ; Ngưỡng kéo chuột
 
 ^!1::HandleMouseAction("^!1")
 ^!2::HandleMouseAction("^!2")
-^!3::HandleMouseAction("^!3")	
+^!3::HandleMouseAction("^!3")
 ^!4::HandleMouseAction("^!4")
 ^!5::HandleMouseAction("^!5")
 ^!6::HandleMouseAction("^!6")
 ^!7::HandleMouseAction("^!7")
 ^!8::HandleMouseAction("^!8")
+
+; Mouse button gestures
+MButton::HandleMouseAction("{mbutton}")
+RButton::HandleMouseAction("{rbutton}")
 
 ;--------------------------------- Mouse Tracking --------------------------------
 
@@ -28,8 +32,17 @@ getAction(hotkey, direction) {
 HandleMouseAction(hotkey) {
     global MoveThreshold
     MouseGetPos, x0, y0
-    StringTrimLeft, key, hotkey, 2
-    KeyWait, %key%
+
+    ; Xử lý các loại hotkey khác nhau
+    if (hotkey = "{mbutton}") {
+        KeyWait, MButton
+    } else if (hotkey = "{rbutton}") {
+        KeyWait, RButton
+    } else {
+        StringTrimLeft, key, hotkey, 2
+        KeyWait, %key%
+    }
+
     MouseGetPos, x1, y1
 
     dx := x1 - x0
@@ -72,7 +85,7 @@ HandleMouseAction(hotkey) {
 
 ;----------------------------------- Functions -----------------------------------
 
-SCI() { 
+SCI() {
     FormatTime, timestamp,, yyyy-MM-dd_HH-mm-ss
     savePath := "C:\EpsteinBackupDrive\SavedPictures\" . timestamp . ".png"
     FileCreateDir, C:\EpsteinBackupDrive\SavedPictures
@@ -93,5 +106,23 @@ SCI() {
     RunWait, powershell.exe -STA -NoProfile -ExecutionPolicy Bypass -File "%tmpPS%",, Hide
     if !FileExist(savePath)
         MsgBox, Unable to detect File.
+}
+
+TypeText() {
+    ; Hiển thị hộp thoại để người dùng nhập text
+    InputBox, userText, Type Text, Enter text to type:, , 400, 150
+
+    ; Kiểm tra nếu người dùng không hủy và có nhập text
+    if (ErrorLevel = 0 && userText != "") {
+        ; Ghi log
+        logDir := A_Desktop "\Log"
+        IfNotExist, %logDir%
+            FileCreateDir, %logDir%
+        logFile := logDir "\gesture_log.txt"
+        FileAppend, %A_Now% - TypeText function called - Text: %userText%`n, %logFile%
+
+        ; Gửi text ra bàn phím
+        SendRaw, %userText%
+    }
 }
 

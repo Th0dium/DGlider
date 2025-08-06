@@ -28,6 +28,7 @@ Imagine your mouse as a gateway to a temple. Each mouse button represents a diff
 - **Browser**: Tab management, refresh, developer tools
 - **Media**: Play/pause, volume control, track navigation
 - **Functions**: Custom function calls (expandable)
+  - **Type Text**: Opens a dialog to input and send custom text
 
 ## Project Status
 
