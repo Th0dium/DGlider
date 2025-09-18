@@ -6,22 +6,15 @@ SetWorkingDir, %A_ScriptDir%
 #InstallMouseHook
 ;----------------------------------- Variables -----------------------------------
 
-;cáº£m biáº¿n mÃ n hÃ¬nh (MoveWin)
 SysGet, screenWidth, 78
 SysGet, screenHeight, 79
-MoveThreshold := 40 ; NgÆ°á»¡ng kÃ©o chuá»™t   
+MoveThreshold := 30 ;   
 
-; Äá»c ngÆ°á»¡ng tá»« file cáº¥u hÃ¬nh náº¿u tá»“n táº¡i (khÃ´ng báº¯t buá»™c)
 IniRead, _cfgThreshold, %A_ScriptDir%\gesture_config.ini, Settings, MoveThreshold, %MoveThreshold%
 if (_cfgThreshold != "")
     MoveThreshold := _cfgThreshold
 
-; Trạng thái OSD âm lượng đang mở để kích hoạt Wheel toàn cục
 VolOSD_Active := 0
-
-; Handle GUI Ã¢m lÆ°á»£ng
-
-
 
 ;------------------------------------- Links -------------------------------------
 
@@ -38,6 +31,10 @@ VolOSD_Active := 0
 MButton::HandleMouseAction("{mbutton}")
 RButton::HandleMouseAction("{rbutton}")
 
+; Navigation button 
+XButton1::HandleMouseAction("{xbutton1}")
+XButton2::HandleMouseAction("{xbutton2}")
+
 ; Hotkey bánh xe chuột khi OSD đang hoạt động (toàn cục)
 #If (VolOSD_Active)
 WheelUp::VolumeOSD_Wheel(1)
@@ -46,7 +43,6 @@ WheelDown::VolumeOSD_Wheel(-1)
 
 ;--------------------------------- Mouse Tracking --------------------------------
 
-; Ghi log táº­p trung
 Log(msg) {
     static logFile
     if (!logFile) {
@@ -58,25 +54,26 @@ Log(msg) {
     FileAppend, %A_Now% - %msg%`n, %logFile%
 }
 
-; Äá»c hÃ nh Ä‘á»™ng tá»« file cáº¥u hÃ¬nh
 getAction(hotkey, direction) {
     IniRead, value, %A_ScriptDir%\gesture_config.ini, Hotkey_%hotkey%, %direction%,
     return value
 }
 
-; Chá» nháº£ phÃ­m/nÃºt theo kiá»ƒu hotkey Ä‘ang dÃ¹ng
 WaitHotkeyRelease(hotkey) {
     if (hotkey = "{mbutton}") {
         KeyWait, MButton
     } else if (hotkey = "{rbutton}") {
         KeyWait, RButton
+            } else if (hotkey = "{xbutton1}") {
+        KeyWait, XButton1
+            } else if (hotkey = "{xbutton2}") {
+        KeyWait, XButton2
     } else {
         StringTrimLeft, key, hotkey, 2
         KeyWait, %key%
     }
 }
 
-; XÃ¡c Ä‘á»‹nh hÆ°á»›ng dá»±a trÃªn chuyá»ƒn Ä‘á»™ng vÃ  ngÆ°á»¡ng
 ResolveDirection(dx, dy, threshold) {
     if (Abs(dx) > Abs(dy)) {
         if (dx > threshold)
@@ -95,7 +92,6 @@ ResolveDirection(dx, dy, threshold) {
     }
 }
 
-; Xá»­ lÃ½ toÃ n bá»™ vÃ²ng Ä‘á»i má»™t gesture
 HandleMouseAction(hotkey) {
     global MoveThreshold
 
@@ -149,15 +145,11 @@ SCI() {
 }
 
 TypeText() {
-    ; Hiá»ƒn thá»‹ há»™p thoáº¡i Ä‘á»ƒ ngÆ°á»i dÃ¹ng nháº­p text
     InputBox, userText, Type Text, Enter text to type:, , 400, 150
 
-    ; Kiá»ƒm tra náº¿u ngÆ°á»i dÃ¹ng khÃ´ng há»§y vÃ  cÃ³ nháº­p text
     if (ErrorLevel = 0 && userText != "") {
-        ; Ghi log
         Log("TypeText function called - Text: " userText)
 
-        ; Gá»­i text ra bÃ n phÃ­m
         SendRaw, %userText%
     }
 }
