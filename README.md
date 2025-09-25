@@ -1,8 +1,9 @@
 # DGlider
 
+**Feeling like your mouse doesn’t have enough buttons? DGlider is the answer!"
+
 **DGlider** is a modular mouse gesture engine that enhances productivity through fully customizable directional gestures. Built with AutoHotkey and Python, it features a flexible configuration system and a GUI for gesture editing.
 
-Imagine your mouse as a gateway to a temple. Each mouse button represents a different “floor” in this temple — and each floor contains five wands, one in each cardinal direction and one right beneath your feet. When you hold a mouse button, you enter that floor. Move your mouse in a direction (up, down, left, right, or just remaining still), then release — and DGlider casts the corresponding actions like spells. (god i play too much Noita)
 
 ## Features
 
@@ -88,6 +89,7 @@ DGlider now features a GUI interface for configuration management. The gesture e
 ## Configuration Files
 
 ### Sample Configuration
+
 
 
 
