@@ -1,6 +1,6 @@
 # DGlider
 
-**Feeling like your mouse doesn’t have enough buttons? DGlider is the answer!"
+**Feeling like your mouse doesn’t have enough buttons? DGlider is the answer!"**
 
 **DGlider** is a modular mouse gesture engine that enhances productivity through fully customizable directional gestures. Built with AutoHotkey and Python, it features a flexible configuration system and a GUI for gesture editing.
 
@@ -89,6 +89,7 @@ DGlider now features a GUI interface for configuration management. The gesture e
 ## Configuration Files
 
 ### Sample Configuration
+
 
 
 
