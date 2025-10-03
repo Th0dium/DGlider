@@ -87,7 +87,7 @@ getAction(hotkey, direction) {
         return value2
     ; 3) Legacy fallback: plain <direction>
     IniRead, value3, %A_ScriptDir%\gesture_config.ini, Hotkey_%hotkey%, %direction%,
-    return value3
+return value3
 }
 
 WaitHotkeyRelease(hotkey) {
@@ -143,8 +143,12 @@ HandleMouseAction(hotkey) {
 
     if (SubStr(action, 1, 3) = "fn:") {
         funcName := SubStr(action, 4)
-        Log("Call function: " funcName)
-        %funcName%()
+        if (IsFunc(funcName)) {
+            Log("Call function: " funcName)
+            %funcName%()
+        } else {
+            Log("Function not found: " funcName)
+        }
     } else if (action != "") {
         Log("Send: " action)
         Send, %action%
@@ -284,7 +288,7 @@ GetProfiles() {
     IniRead, names, %A_ScriptDir%\gesture_config.ini, Profiles, Names, default
     if (names = "")
         names := "default"
-    return names
+return names
 }
 
 ProfileSet(name) {

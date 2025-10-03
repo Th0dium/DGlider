@@ -104,10 +104,10 @@ Example:
 - `gesture_config.ini:1` `[Settings]` with `ActiveProfile=dglider`
 - `gesture_config.ini:4` `[Profiles]` with `Names=dglider,default`
 - Per‑profile hotkey sections:
-  - `gesture_config.ini` → `[Profile_dglider_Hotkey_^!2]` → `up=fn:ProfileNext`
-  - `gesture_config.ini` → `[Profile_default_Hotkey_^!2]` → `default={Enter}`
+  - `gesture_config.ini` → `[Profile_dglider_Hotkey_^!2]` → `up=fn:SelectProfile`
+  - `gesture_config.ini` → `[Profile_default_Hotkey_^!2]` ? `default={Enter}`
 
 Functions to switch profile (bind via `fn:` like other actions):
 
-- `fn:ProfileNext` cycles to the next profile in `[Profiles].Names` and saves it to `[Settings].ActiveProfile`.
+- `fn:SelectProfile` cycles to the next profile in `[Profiles].Names` and saves it to `[Settings].ActiveProfile`.
 - `fn:ProfilePrompt` shows an input box to type/select a profile name.
