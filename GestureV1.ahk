@@ -10,6 +10,13 @@ SysGet, screenWidth, 78
 SysGet, screenHeight, 79
 MoveThreshold := 30 ;   
 
+; Profile support
+ActiveProfile := "dglider"
+
+IniRead, _cfgProfile, %A_ScriptDir%\gesture_config.ini, Settings, ActiveProfile, %ActiveProfile%
+if (_cfgProfile != "")
+    ActiveProfile := _cfgProfile
+
 IniRead, _cfgThreshold, %A_ScriptDir%\gesture_config.ini, Settings, MoveThreshold, %MoveThreshold%
 if (_cfgThreshold != "")
     MoveThreshold := _cfgThreshold
@@ -37,7 +44,7 @@ XButton2::HandleMouseAction("{xbutton2}")
 
 ; Hotkey bánh xe chuột khi OSD đang hoạt động (toàn cục)
 #If (VolOSD_Active)
-WheelUp::VolumeOSD_Wheel(1)
+    WheelUp::VolumeOSD_Wheel(1)
 WheelDown::VolumeOSD_Wheel(-1)
 #If
 
@@ -55,8 +62,19 @@ Log(msg) {
 }
 
 getAction(hotkey, direction) {
-    IniRead, value, %A_ScriptDir%\gesture_config.ini, Hotkey_%hotkey%, %direction%,
-    return value
+    global ActiveProfile
+    ; 1) New scheme: section = Profile_<profile>_Hotkey_<hotkey>, key = <direction>
+    section := "Profile_" ActiveProfile "_Hotkey_" hotkey
+    IniRead, value, %A_ScriptDir%\gesture_config.ini, %section%, %direction%,
+    if (value != "")
+        return value
+    ; 2) Old scheme (namespaced key inside Hotkey_ section): <profile>.<direction>
+    IniRead, value2, %A_ScriptDir%\gesture_config.ini, Hotkey_%hotkey%, %ActiveProfile%.%direction%,
+    if (value2 != "")
+        return value2
+    ; 3) Legacy fallback: plain <direction>
+    IniRead, value3, %A_ScriptDir%\gesture_config.ini, Hotkey_%hotkey%, %direction%,
+    return value3
 }
 
 WaitHotkeyRelease(hotkey) {
@@ -64,9 +82,9 @@ WaitHotkeyRelease(hotkey) {
         KeyWait, MButton
     } else if (hotkey = "{rbutton}") {
         KeyWait, RButton
-            } else if (hotkey = "{xbutton1}") {
+    } else if (hotkey = "{xbutton1}") {
         KeyWait, XButton1
-            } else if (hotkey = "{xbutton2}") {
+    } else if (hotkey = "{xbutton2}") {
         KeyWait, XButton2
     } else {
         StringTrimLeft, key, hotkey, 2
@@ -94,6 +112,7 @@ ResolveDirection(dx, dy, threshold) {
 
 HandleMouseAction(hotkey) {
     global MoveThreshold
+    global ActiveProfile
 
     MouseGetPos, x0, y0
     WaitHotkeyRelease(hotkey)
@@ -102,7 +121,7 @@ HandleMouseAction(hotkey) {
     dx := x1 - x0
     dy := y1 - y0
 
-    Log("Hotkey: " hotkey " | dx: " dx " | dy: " dy)
+    Log("Hotkey: " hotkey " | Profile: " ActiveProfile " | dx: " dx " | dy: " dy)
 
     direction := ResolveDirection(dx, dy, MoveThreshold)
     action := getAction(hotkey, direction)
@@ -154,9 +173,6 @@ TypeText() {
     }
 }
 
-
-; (removed) work area variant
-
 ; Hien thi OSD am luong o goc duoi ben trai. Lan chuot de thay doi am luong.
 ; Khi kich hoat, focus vao OSD; tu dong dong khi mat focus (click sang cua so khac).
 VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
@@ -165,10 +181,10 @@ VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
     static osdHwnd := 0
     ; minimal state
     ; Constants
-    static STEP := 3          ; buoc tang/giam (%) khi wheel
-    static PAD  := 10         ; le trai/duoi OSD
-    static BAR_W := 200       ; chieu rong progress bar
-    static BAR_H := 12        ; chieu cao progress bar
+    static STEP := 3 ; buoc tang/giam (%) khi wheel
+    static PAD := 10 ; le trai/duoi OSD
+    static BAR_W := 200 ; chieu rong progress bar
+    static BAR_H := 12 ; chieu cao progress bar
 
     ; Xu ly message tu OnMessage
     if (msg != "") {
@@ -235,5 +251,58 @@ VolumeOSD_Wheel(dir) {
     GuiControl, OSDVol:, OSDBar, %newVal%
 }
 
+;------------------------------- Profile Management ------------------------------
 
+GetProfiles() {
+    ; Return a list string of profiles (comma/pipe/semicolon separated). Defaults to "default".
+    IniRead, names, %A_ScriptDir%\gesture_config.ini, Profiles, Names, default
+    if (names = "")
+        names := "default"
+    return names
+}
 
+ProfileSet(name) {
+    global ActiveProfile
+    if (name = "")
+        return
+    ActiveProfile := name
+    IniWrite, %name%, %A_ScriptDir%\gesture_config.ini, Settings, ActiveProfile
+    TrayTip, DGlider, Active profile: %name%, 1500
+    Log("Switched profile -> " name)
+}
+
+ProfileNext() {
+    global ActiveProfile
+    names := GetProfiles()
+    ; Normalize separators to comma
+    names := StrReplace(names, "|", ",")
+    names := StrReplace(names, ";", ",")
+    ; Remove spaces
+    names := StrReplace(names, A_Space, "")
+    arr := StrSplit(names, ",")
+    if (arr.MaxIndex() < 1) {
+        ProfileSet("default")
+        return
+    }
+    idx := 0
+    Loop % arr.MaxIndex()
+    {
+        if (arr[A_Index] = ActiveProfile) {
+            idx := A_Index
+            break
+        }
+    }
+    nextIdx := (idx >= 1 && idx < arr.MaxIndex()) ? (idx + 1) : 1
+    ProfileSet(arr[nextIdx])
+}
+
+ProfilePrompt() {
+    global ActiveProfile
+    names := GetProfiles()
+    ; Show current and accept new name
+    InputBox, newProf, Switch Profile, Available: %names%`nCurrent: %ActiveProfile%`nEnter profile name:, , 420, 180
+    if (ErrorLevel)
+        return
+    if (newProf != "")
+        ProfileSet(newProf)
+}

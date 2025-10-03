@@ -91,3 +91,23 @@ DGlider now features a GUI interface for configuration management. The gesture e
 
 
 
+
+## Profiles
+
+- Multiple profiles live in the same `gesture_config.ini`.
+- Active profile is set under `[Settings]` → `ActiveProfile`.
+- Profile list is under `[Profiles]` → `Names` (comma/pipe/semicolon separated). Example: `Names=dglider,default`.
+- Clean layout: sections are grouped by profile and hotkey as `Profile_<profile>_Hotkey_<hotkey>` with keys: `up`, `down`, `left`, `right`, `default`.
+
+Example:
+
+- `gesture_config.ini:1` `[Settings]` with `ActiveProfile=dglider`
+- `gesture_config.ini:4` `[Profiles]` with `Names=dglider,default`
+- Per‑profile hotkey sections:
+  - `gesture_config.ini` → `[Profile_dglider_Hotkey_^!2]` → `up=fn:ProfileNext`
+  - `gesture_config.ini` → `[Profile_default_Hotkey_^!2]` → `default={Enter}`
+
+Functions to switch profile (bind via `fn:` like other actions):
+
+- `fn:ProfileNext` cycles to the next profile in `[Profiles].Names` and saves it to `[Settings].ActiveProfile`.
+- `fn:ProfilePrompt` shows an input box to type/select a profile name.
