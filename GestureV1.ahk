@@ -1,4 +1,4 @@
-;------------------------------------- Traits -------------------------------------
+ï»¿;------------------------------------- Traits -------------------------------------
 #NoEnv
 #SingleInstance Force
 SendMode, Input
@@ -32,7 +32,6 @@ VolOSD_Active := 0
 ^!5::HandleMouseAction("^!5")
 ^!6::HandleMouseAction("^!6")
 ^!7::HandleMouseAction("^!7")
-^!8::HandleMouseAction("^!8")
 
 ; Mouse button gestures
 MButton::HandleMouseAction("{mbutton}")
@@ -173,27 +172,22 @@ TypeText() {
     }
 }
 
-; Show a simple Volume OSD at bottom-left. Use mouse wheel to adjust volume.
+; Show a simple Volume OSD at middle-left. Use mouse wheel to adjust volume.
 ; When activated, focus goes to the OSD; auto-closes when it loses focus.
 VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
     global VolOSD_Active
     global OSDBar
     static osdHwnd := 0
-    ; minimal state
-    ; Constants
-    static STEP := 3 ; buoc tang/giam (%) khi wheel
-    static PAD := 10 ; le trai/duoi OSD
-    static BAR_W := 200 ; chieu rong progress bar
-    static BAR_H := 12 ; chieu cao progress bar
+    static STEP := 3 ; Step volume change per wheel notch
+    static PAD := 10 ; Left/Right padding of OSD
+    static BAR_W := 200 ; Width of progress bar
+    static BAR_H := 12 ; Height of progress bar
 
     ; Handle messages from OnMessage
     if (msg != "") {
-        ; Only accept messages for the OSD GUI
         if (hwnd != osdHwnd)
             return
-
         ; Mouse wheel is handled by global hotkeys when OSD is active
-
         ; Lose focus -> destroy OSD (WM_ACTIVATE: 0 = inactive)
         if (msg = 0x0006) {
             if ((wParam & 0xFFFF) = 0) {
@@ -233,7 +227,6 @@ VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
     Log("VolumeOSD opened and activated at " curVol "%")
 }
 
-; X? lý cu?n chu?t toàn c?c khi OSD dang ho?t d?ng
 VolumeOSD_Wheel(dir) {
     global OSDBar
     ; dir: 1 = up, -1 = down
@@ -247,7 +240,7 @@ VolumeOSD_Wheel(dir) {
     if (newVal < 0)
         newVal := 0
     SoundSet, %newVal%
-    ; C?p nh?t OSD n?u dang m?
+    ; Update OSD if it's visible
     GuiControl, OSDVol:, OSDBar, %newVal%
 }
 
