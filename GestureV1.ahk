@@ -1,4 +1,4 @@
-﻿;------------------------------------- Trait --------------------------------------
+;------------------------------------- Traits -------------------------------------
 #NoEnv
 #SingleInstance Force
 SendMode, Input
@@ -23,7 +23,7 @@ if (_cfgThreshold != "")
 
 VolOSD_Active := 0
 
-;------------------------------------- Links -------------------------------------
+;------------------------------------- Hotkeys ------------------------------------
 
 ^!1::HandleMouseAction("^!1")
 ^!2::HandleMouseAction("^!2")
@@ -38,17 +38,17 @@ VolOSD_Active := 0
 MButton::HandleMouseAction("{mbutton}")
 RButton::HandleMouseAction("{rbutton}")
 
-; Navigation button 
+; Navigation buttons
 XButton1::HandleMouseAction("{xbutton1}")
 XButton2::HandleMouseAction("{xbutton2}")
 
-; Hotkey bánh xe chuột khi OSD đang hoạt động (toàn cục)
+; Global wheel hotkeys when Volume OSD is active
 #If (VolOSD_Active)
     WheelUp::VolumeOSD_Wheel(1)
 WheelDown::VolumeOSD_Wheel(-1)
 #If
 
-;--------------------------------- Mouse Tracking --------------------------------
+;------------------------------- Gesture Dispatch --------------------------------
 
 Log(msg) {
     static logFile
@@ -173,8 +173,8 @@ TypeText() {
     }
 }
 
-; Hien thi OSD am luong o goc duoi ben trai. Lan chuot de thay doi am luong.
-; Khi kich hoat, focus vao OSD; tu dong dong khi mat focus (click sang cua so khac).
+; Show a simple Volume OSD at bottom-left. Use mouse wheel to adjust volume.
+; When activated, focus goes to the OSD; auto-closes when it loses focus.
 VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
     global VolOSD_Active
     global OSDBar
@@ -186,15 +186,15 @@ VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
     static BAR_W := 200 ; chieu rong progress bar
     static BAR_H := 12 ; chieu cao progress bar
 
-    ; Xu ly message tu OnMessage
+    ; Handle messages from OnMessage
     if (msg != "") {
-        ; Chi nhan message thuoc GUI OSD
+        ; Only accept messages for the OSD GUI
         if (hwnd != osdHwnd)
             return
 
-        ; (Wheel được xử lý bằng hotkey toàn cục khi OSD active)
+        ; Mouse wheel is handled by global hotkeys when OSD is active
 
-        ; Mat focus -> dong OSD (WM_ACTIVATE: 0 = inactive)
+        ; Lose focus -> destroy OSD (WM_ACTIVATE: 0 = inactive)
         if (msg = 0x0006) {
             if ((wParam & 0xFFFF) = 0) {
                 Gui, OSDVol:Destroy
@@ -206,7 +206,7 @@ VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
         return
     }
 
-    ; Goi truc tiep de mo/hien OSD va focus vao no
+    ; Open/show OSD and focus it
     SoundGet, curVol
     if (curVol = "")
         curVol := 50
@@ -233,7 +233,7 @@ VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
     Log("VolumeOSD opened and activated at " curVol "%")
 }
 
-; Xử lý cuộn chuột toàn cục khi OSD đang hoạt động
+; X? l� cu?n chu?t to�n c?c khi OSD dang ho?t d?ng
 VolumeOSD_Wheel(dir) {
     global OSDBar
     ; dir: 1 = up, -1 = down
@@ -247,7 +247,7 @@ VolumeOSD_Wheel(dir) {
     if (newVal < 0)
         newVal := 0
     SoundSet, %newVal%
-    ; Cập nhật OSD nếu đang mở
+    ; C?p nh?t OSD n?u dang m?
     GuiControl, OSDVol:, OSDBar, %newVal%
 }
 
