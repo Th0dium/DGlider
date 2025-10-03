@@ -34,8 +34,10 @@ VolOSD_Active := 0
 ^!7::HandleMouseAction("^!7")
 
 ; Mouse button gestures
+#If (ActiveProfile != "Off")
 MButton::HandleMouseAction("{mbutton}")
 RButton::HandleMouseAction("{rbutton}")
+#If
 
 ; Navigation buttons
 XButton1::HandleMouseAction("{xbutton1}")
