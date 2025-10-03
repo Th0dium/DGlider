@@ -23,7 +23,13 @@ if (_cfgThreshold != "")
 
 VolOSD_Active := 0
 
-;------------------------------------- Hotkeys ------------------------------------
+; Initialize mouse-button hotkeys based on current profile
+SetupMouseButtonHotkeys()
+
+; Initialize dynamic mouse-button hotkeys based on current profile
+SetupMouseButtonHotkeys()
+
+;--------------------------------- Key pickup ------------------------------------
 
 ^!1::HandleMouseAction("^!1")
 ^!2::HandleMouseAction("^!2")
@@ -33,11 +39,17 @@ VolOSD_Active := 0
 ^!6::HandleMouseAction("^!6")
 ^!7::HandleMouseAction("^!7")
 
-; Mouse button gestures
-#If (ActiveProfile != "Off")
-MButton::HandleMouseAction("{mbutton}")
-RButton::HandleMouseAction("{rbutton}")
-#If
+; Mouse button gestures (managed dynamically by profile)
+; Bindings are set via SetupMouseButtonHotkeys/ApplyProfileHotkeys.
+; Labels for handlers are defined here:
+
+MBUTTON_HOTKEY:
+    HandleMouseAction("{mbutton}")
+return
+
+RBUTTON_HOTKEY:
+    HandleMouseAction("{rbutton}")
+return
 
 ; Navigation buttons
 XButton1::HandleMouseAction("{xbutton1}")
@@ -136,6 +148,25 @@ HandleMouseAction(hotkey) {
     } else if (action != "") {
         Log("Send: " action)
         Send, %action%
+    }
+}
+
+; Hotkey setup/toggle for mouse buttons (MButton/RButton) based on profile
+SetupMouseButtonHotkeys() {
+    ; Assign labels once, then toggle On/Off per profile
+    Hotkey, MButton, MBUTTON_HOTKEY
+    Hotkey, RButton, RBUTTON_HOTKEY
+    ApplyProfileHotkeys()
+}
+
+ApplyProfileHotkeys() {
+    global ActiveProfile
+    if (ActiveProfile = "Off") {
+        Hotkey, MButton, Off
+        Hotkey, RButton, Off
+    } else {
+        Hotkey, MButton, On
+        Hotkey, RButton, On
     }
 }
 
@@ -264,31 +295,13 @@ ProfileSet(name) {
     IniWrite, %name%, %A_ScriptDir%\gesture_config.ini, Settings, ActiveProfile
     TrayTip, DGlider, Active profile: %name%, 1500
     Log("Switched profile -> " name)
+    ; Ensure mouse-button hotkeys reflect current profile state
+    ApplyProfileHotkeys()
 }
 
+; Backward-compatible entry point: show selector instead of cycling
 ProfileNext() {
-    global ActiveProfile
-    names := GetProfiles()
-    ; Normalize separators to comma
-    names := StrReplace(names, "|", ",")
-    names := StrReplace(names, ";", ",")
-    ; Remove spaces
-    names := StrReplace(names, A_Space, "")
-    arr := StrSplit(names, ",")
-    if (arr.MaxIndex() < 1) {
-        ProfileSet("default")
-        return
-    }
-    idx := 0
-    Loop % arr.MaxIndex()
-    {
-        if (arr[A_Index] = ActiveProfile) {
-            idx := A_Index
-            break
-        }
-    }
-    nextIdx := (idx >= 1 && idx < arr.MaxIndex()) ? (idx + 1) : 1
-    ProfileSet(arr[nextIdx])
+    SelectProfile()
 }
 
 ProfilePrompt() {
@@ -301,3 +314,56 @@ ProfilePrompt() {
     if (newProf != "")
         ProfileSet(newProf)
 }
+
+; Show a small two-column GUI to select a profile
+SelectProfile() {
+    names := GetProfiles()
+    ; Normalize separators to comma and strip spaces
+    names := StrReplace(names, "|", ",")
+    names := StrReplace(names, ";", ",")
+    names := StrReplace(names, A_Space, "")
+    arr := StrSplit(names, ",")
+    if (arr.MaxIndex() < 1)
+        return
+
+    Gui, ProfSel:Destroy
+    Gui, ProfSel:New, +AlwaysOnTop +ToolWindow, Select Profile
+    Gui, ProfSel:Margin, 10, 10
+
+    rows := Ceil(arr.MaxIndex()/2.0)
+    btnW := 140
+    btnH := 28
+    gap := 6
+    col1x := 10
+    col2x := col1x + btnW + 10
+
+    Loop % arr.MaxIndex()
+    {
+        idx := A_Index
+        name := arr[idx]
+        col := (idx <= rows) ? 1 : 2
+        rowIdx := (col=1) ? idx : (idx - rows)
+        x := (col=1) ? col1x : col2x
+        y := 10 + (rowIdx-1)*(btnH+gap)
+        ctrlVar := "ProfBtn" idx
+        opts := "x" x " y" y " w" btnW " h" btnH " gSelectProfile_Click"
+        Gui, ProfSel:Add, Button, %opts%, %name%
+    }
+
+    Gui, ProfSel:Show, AutoSize, Select Profile
+}
+
+SelectProfile_Click:
+    GuiControlGet, prof, ProfSel:, %A_GuiControl%, Text
+    if (prof != "")
+        ProfileSet(prof)
+    Gui, ProfSel:Destroy
+return
+
+ProfSelGuiEscape:
+    Gui, ProfSel:Destroy
+return
+
+ProfSelGuiClose:
+    Gui, ProfSel:Destroy
+return
