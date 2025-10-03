@@ -215,7 +215,7 @@ VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
     global VolOSD_Active
     global OSDBar
     static osdHwnd := 0
-    static STEP := 3 ; Step volume change per wheel notch
+    static STEP := 2 ; Step volume change per wheel notch
     static PAD := 10 ; Left/Right padding of OSD
     static BAR_W := 200 ; Width of progress bar
     static BAR_H := 12 ; Height of progress bar
@@ -253,6 +253,9 @@ VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
         GuiControl, OSDVol:, OSDBar, %curVol%
     }
 
+    ; Enable wheel hotkeys immediately before showing the GUI
+    VolOSD_Active := 1
+
     Gui, OSDVol:Show, Hide AutoSize
     WinGetPos,,, w, h, ahk_id %osdHwnd%
     posX := 10
@@ -260,7 +263,6 @@ VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
     Gui, OSDVol:Show
     WinMove, ahk_id %osdHwnd%,, %posX%, %posY%
     WinActivate, ahk_id %osdHwnd%
-    VolOSD_Active := 1
     Log("VolumeOSD opened and activated at " curVol "%")
 }
 
