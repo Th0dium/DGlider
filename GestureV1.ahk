@@ -205,22 +205,43 @@ SetupMouseButtonHotkeys() {
 
 ApplyProfileHotkeys() {
     global ActiveProfile
-    state := (ActiveProfile = "Off") ? "Off" : "On"
+    disabled := GetProfileDisabledKeys(ActiveProfile)
     ; Mouse buttons
-    Hotkey, MButton, %state%
-    Hotkey, RButton, %state%
+    Hotkey, MButton, % ShouldDisable(disabled, "{mbutton}") ? "Off" : "On"
+    Hotkey, RButton, % ShouldDisable(disabled, "{rbutton}") ? "Off" : "On"
     ; Navigation buttons
-    Hotkey, XButton1, %state%
-    Hotkey, XButton2, %state%
+    Hotkey, XButton1, % ShouldDisable(disabled, "{xbutton1}") ? "Off" : "On"
+    Hotkey, XButton2, % ShouldDisable(disabled, "{xbutton2}") ? "Off" : "On"
     ; Ctrl+Alt+1..8
-    Hotkey, ^!1, %state%
-    Hotkey, ^!2, %state%
-    Hotkey, ^!3, %state%
-    Hotkey, ^!4, %state%
-    Hotkey, ^!5, %state%
-    Hotkey, ^!6, %state%
-    Hotkey, ^!7, %state%
-    Hotkey, ^!8, %state%
+    Hotkey, ^!1, % ShouldDisable(disabled, "^!1") ? "Off" : "On"
+    Hotkey, ^!2, % ShouldDisable(disabled, "^!2") ? "Off" : "On"
+    Hotkey, ^!3, % ShouldDisable(disabled, "^!3") ? "Off" : "On"
+    Hotkey, ^!4, % ShouldDisable(disabled, "^!4") ? "Off" : "On"
+    Hotkey, ^!5, % ShouldDisable(disabled, "^!5") ? "Off" : "On"
+    Hotkey, ^!6, % ShouldDisable(disabled, "^!6") ? "Off" : "On"
+    Hotkey, ^!7, % ShouldDisable(disabled, "^!7") ? "Off" : "On"
+    Hotkey, ^!8, % ShouldDisable(disabled, "^!8") ? "Off" : "On"
+}
+
+ShouldDisable(disabledList, key) {
+    ; disabledList: comma-separated list (case-insensitive match)
+    ; key: literal like "^!1" or "{mbutton}"
+    StringLower, lk, key
+    StringLower, dl, disabledList
+    return InStr("," dl ",", "," lk ",")
+}
+
+; Return a comma-separated, lowercase list of disabled keys for a given profile
+GetProfileDisabledKeys(profile) {
+    IniRead, raw, %A_ScriptDir%\gesture_config.ini, Profile_%profile%_Disabled, Keys,
+    if (raw = "")
+        return ""
+    ; normalize separators and spaces, to lowercase
+    raw := StrReplace(raw, "|", ",")
+    raw := StrReplace(raw, ";", ",")
+    raw := StrReplace(raw, A_Space, "")
+    StringLower, raw, raw
+    return raw
 }
 
 ;----------------------------------- Functions -----------------------------------
