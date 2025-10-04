@@ -23,21 +23,43 @@ if (_cfgThreshold != "")
 
 VolOSD_Active := 0
 
-; Initialize mouse-button hotkeys based on current profile
-SetupMouseButtonHotkeys()
-
-; Initialize dynamic mouse-button hotkeys based on current profile
+; Initialize gesture hotkeys based on current profile
 SetupMouseButtonHotkeys()
 
 ;--------------------------------- Key pickup ------------------------------------
 
-^!1::HandleMouseAction("^!1")
-^!2::HandleMouseAction("^!2")
-^!3::HandleMouseAction("^!3")
-^!4::HandleMouseAction("^!4")
-^!5::HandleMouseAction("^!5")
-^!6::HandleMouseAction("^!6")
-^!7::HandleMouseAction("^!7")
+; Labels for dynamic hotkeys (Ctrl+Alt+1..8)
+HK_CTRLALT_1:
+    HandleMouseAction("^!1")
+return
+
+HK_CTRLALT_2:
+    HandleMouseAction("^!2")
+return
+
+HK_CTRLALT_3:
+    HandleMouseAction("^!3")
+return
+
+HK_CTRLALT_4:
+    HandleMouseAction("^!4")
+return
+
+HK_CTRLALT_5:
+    HandleMouseAction("^!5")
+return
+
+HK_CTRLALT_6:
+    HandleMouseAction("^!6")
+return
+
+HK_CTRLALT_7:
+    HandleMouseAction("^!7")
+return
+
+HK_CTRLALT_8:
+    HandleMouseAction("^!8")
+return
 
 ; Mouse button gestures (managed dynamically by profile)
 ; Bindings are set via SetupMouseButtonHotkeys/ApplyProfileHotkeys.
@@ -51,9 +73,14 @@ RBUTTON_HOTKEY:
     HandleMouseAction("{rbutton}")
 return
 
-; Navigation buttons
-XButton1::HandleMouseAction("{xbutton1}")
-XButton2::HandleMouseAction("{xbutton2}")
+; Navigation buttons (dynamic)
+XBUTTON1_HOTKEY:
+    HandleMouseAction("{xbutton1}")
+return
+
+XBUTTON2_HOTKEY:
+    HandleMouseAction("{xbutton2}")
+return
 
 ; Global wheel hotkeys when Volume OSD is active
 #If (VolOSD_Active)
@@ -158,20 +185,42 @@ HandleMouseAction(hotkey) {
 ; Hotkey setup/toggle for mouse buttons (MButton/RButton) based on profile
 SetupMouseButtonHotkeys() {
     ; Assign labels once, then toggle On/Off per profile
+    ; Mouse buttons
     Hotkey, MButton, MBUTTON_HOTKEY
     Hotkey, RButton, RBUTTON_HOTKEY
+    ; Navigation buttons
+    Hotkey, XButton1, XBUTTON1_HOTKEY
+    Hotkey, XButton2, XBUTTON2_HOTKEY
+    ; Ctrl+Alt+1..8
+    Hotkey, ^!1, HK_CTRLALT_1
+    Hotkey, ^!2, HK_CTRLALT_2
+    Hotkey, ^!3, HK_CTRLALT_3
+    Hotkey, ^!4, HK_CTRLALT_4
+    Hotkey, ^!5, HK_CTRLALT_5
+    Hotkey, ^!6, HK_CTRLALT_6
+    Hotkey, ^!7, HK_CTRLALT_7
+    Hotkey, ^!8, HK_CTRLALT_8
     ApplyProfileHotkeys()
 }
 
 ApplyProfileHotkeys() {
     global ActiveProfile
-    if (ActiveProfile = "Off") {
-        Hotkey, MButton, Off
-        Hotkey, RButton, Off
-    } else {
-        Hotkey, MButton, On
-        Hotkey, RButton, On
-    }
+    state := (ActiveProfile = "Off") ? "Off" : "On"
+    ; Mouse buttons
+    Hotkey, MButton, %state%
+    Hotkey, RButton, %state%
+    ; Navigation buttons
+    Hotkey, XButton1, %state%
+    Hotkey, XButton2, %state%
+    ; Ctrl+Alt+1..8
+    Hotkey, ^!1, %state%
+    Hotkey, ^!2, %state%
+    Hotkey, ^!3, %state%
+    Hotkey, ^!4, %state%
+    Hotkey, ^!5, %state%
+    Hotkey, ^!6, %state%
+    Hotkey, ^!7, %state%
+    Hotkey, ^!8, %state%
 }
 
 ;----------------------------------- Functions -----------------------------------
@@ -215,7 +264,7 @@ VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
     global VolOSD_Active
     global OSDBar
     static osdHwnd := 0
-    static STEP := 2 ; Step volume change per wheel notch
+    static STEP := 1 ; Step volume change per wheel notch
     static PAD := 10 ; Left/Right padding of OSD
     static BAR_W := 200 ; Width of progress bar
     static BAR_H := 12 ; Height of progress bar
