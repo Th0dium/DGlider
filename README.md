@@ -1,113 +1,103 @@
 # DGlider
 
-**DGlider** is a modular mouse gesture engine that enhances productivity through fully customizable directional gestures. Built with AutoHotkey and Python, it features a flexible configuration system and a GUI for gesture editing.
-
-Imagine your mouse as a gateway to a temple. Each mouse button represents a different “floor” in this temple — and each floor contains five wands, one in each cardinal direction and one right beneath your feet. When you hold a mouse button, you enter that floor. Move your mouse in a direction (up, down, left, right, or just remaining still), then release — and DGlider casts the corresponding actions like spells. (god i play too much Noita)
+DGlider is a modular mouse-gesture engine for Windows (AutoHotkey v1) with a flexible, profile‑based configuration. It lets you bind directional gestures (Up, Down, Left, Right, Default) per hotkey (keyboard/mouse) to send keys or call functions.
 
 ## Features
 
-### Core Engine
-- **Directional gesture recognition**: Up / Down / Left / Right / Default
-- **Per-hotkey gesture mapping**: Configure multiple hotkey combinations
-- **Action types**: Trigger key sequences or built-in functions
-- **Configurable threshold**: Adjust gesture sensitivity
-- **Comprehensive logging**: Track all gesture activities
-
-### GUI Features
-- **Modern tabbed interface**: Organized configuration management
-- **Mouse button selection**: Choose which mouse button to use
-- **Hotkey library**: Extensive collection of pre-defined shortcuts
-- **Live preview**: See your configuration before applying
-- **Multiple export formats**: JSON, INI, and AutoHotkey script generation
-- **Configuration management**: Save, load, and manage multiple profiles
-- **Log viewer**: Monitor gesture usage and debug issues
-
-### Hotkey Library Categories
-- **System**: Copy, Paste, Cut, Undo, Redo, Save, etc.
-- **Navigation**: Alt+Tab, Windows key shortcuts, Task Manager
-- **Browser**: Tab management, refresh, developer tools
-- **Media**: Play/pause, volume control, track navigation
-- **Functions**: Custom function calls (expandable)
-  - **Type Text**: Opens a dialog to input and send custom text
-
-## Project Status
-
-DGlider now features a GUI interface for configuration management. The gesture engine is somewhat functional with logging and multiple export options.
-
-## Tech Stack
-
-- **AutoHotkey (v1)**: Core gesture engine
-- **Python 3.x**: GUI application with tkinter
-- **JSON/INI**: Configuration formats
-- **Modern UI**: Tabbed interface with scrollable areas
+- Directional gesture recognition: Up / Down / Left / Right / Default
+- Per‑hotkey gesture mapping (keyboard combos and mouse buttons)
+- Action types: send key sequences or call built‑in functions (`fn:Name`)
+- Profiles: multiple profiles in one INI, with per‑profile hotkey sections
+- Per‑profile disabled hotkeys (choose which hotkeys are untracked)
+- Logging for debugging (Desktop\Log\gesture_log.txt)
 
 ## Getting Started
 
-### Prerequisites
-1. **AutoHotkey v1**: Download from [autohotkey.com](https://autohotkey.com)
-2. **Python 3.x**
+Prerequisites
+- AutoHotkey v1
+- Python 3.x (for the separate GUI, if used)
 
-### Quick Start
-1. **Clone this repository**
-2. **Launch the GUI**: Run the .bat file
-3. **Configure gestures**: Use the GUI to set up your preferred shortcuts
-4. **Export configuration**: Generate AutoHotkey script or save as JSON/INI
-5. **Run the engine**: Execute `GestureV1.ahk` to activate gestures
+Quick Start
+1. Run `GestureV1.ahk` to activate gestures.
+2. Edit `gesture_config.ini` to customize mappings.
+3. Use a gesture mapped to `fn:SelectProfile` to switch profiles via a small selector GUI.
 
-### Using the GUI
+Example Usage
+1. Hold `Ctrl+Alt+1` (or a mouse button you’ve mapped).
+2. Move mouse Up → Copy (Ctrl+C)
+3. Move mouse Down → Paste (Ctrl+V)
+4. Move mouse Left → Undo (Ctrl+Z)
+5. Move mouse Right → Redo (Ctrl+Y)
+6. Release without moving (Default) → e.g. Screenshot
 
-#### Gesture Configuration Tab
-- Select mouse button for gestures
-- Add/remove hotkey combinations
-- Configure actions for each direction (↑↓←→●)
-- Browse the hotkey library for quick assignment
+## Configuration Overview
 
-#### Settings Tab
-- Adjust gesture threshold (sensitivity)
-- Configure auto-save options
-- Manage configuration files
+The config file `gesture_config.ini` stores everything.
 
-#### Hotkey Library Tab
-- Browse pre-defined shortcuts by category
-- Add custom categories and hotkeys
-- Edit existing library entries
+- `[Settings]` → `ActiveProfile` selects which profile is active.
+- `[Profiles]` → `Names` lists available profiles (comma/pipe/semicolon separated).
+- For each profile, gestures live under sections:
+  - `Profile_<profile>_Hotkey_<hotkey>` with keys: `up`, `down`, `left`, `right`, `default`.
+  - Example hotkeys: `^!1`..`^!8`, `{mbutton}`, `{rbutton}`, `{xbutton1}`, `{xbutton2}`.
+- Empty directions should be written as `{}` (no‑op). The engine ignores `{}`.
 
-#### Preview & Export Tab
-- View complete configuration
-- Export to AutoHotkey script
-- Save as JSON or INI format
+Example (simplified)
 
-### Example Usage
-1. Press and hold `Ctrl+Alt+1` (you can assign a mouse button)
-2. Move mouse **up** → Copy (Ctrl+C)
-3. Move mouse **down** → Paste (Ctrl+V)
-4. Move mouse **left** → Undo (Ctrl+Z)
-5. Move mouse **right** → Redo (Ctrl+Y)
-6. Release without moving → Screenshot (Win+Shift+S)
+```
+[Settings]
+ActiveProfile=dglider
 
-## Configuration Files
+[Profiles]
+Names=dglider,default,Off
 
-### Sample Configuration
+[Profile_dglider_Hotkey_^!2]
+up=fn:SelectProfile
+default={Enter}
 
+[Profile_default_Hotkey_^!2]
+default={Enter}
 
+[Profile_dglider_Hotkey_{xbutton1}]
+right=^+{Tab}
+down=^+{t}
+up=^{w}
+default=!{left}
 
+[Profile_default_Hotkey_{xbutton1}]
+default=^!5
+```
 
 ## Profiles
 
-- Multiple profiles live in the same `gesture_config.ini`.
-- Active profile is set under `[Settings]` → `ActiveProfile`.
-- Profile list is under `[Profiles]` → `Names` (comma/pipe/semicolon separated). Example: `Names=dglider,default`.
-- Clean layout: sections are grouped by profile and hotkey as `Profile_<profile>_Hotkey_<hotkey>` with keys: `up`, `down`, `left`, `right`, `default`.
+- Multiple profiles in the same file: e.g., `dglider`, `default`, `Off`.
+- Select a profile via gesture mapped to `fn:SelectProfile` (opens a two‑column selector GUI) or `fn:ProfilePrompt` (input box).
+- The script logs active profile per gesture for transparency.
 
-Example:
+Per‑Profile Disabled Hotkeys
+- Each profile can disable any subset of gesture hotkeys so they are not tracked (pass‑through behavior).
+- Section: `Profile_<profile>_Disabled` with `Keys` listing the disabled hotkeys.
+- Format: comma/pipe/semicolon separated; case‑insensitive. Examples:
+  - Mouse only: `Keys={mbutton},{rbutton}`
+  - XButtons: `Keys={xbutton1},{xbutton2}`
+  - Specific keys: `Keys=^!5,^!6`
+  - Disable all (like Off): `Keys=^!1,^!2,^!3,^!4,^!5,^!6,^!7,^!8,{mbutton},{rbutton},{xbutton1},{xbutton2}`
 
-- `gesture_config.ini:1` `[Settings]` with `ActiveProfile=dglider`
-- `gesture_config.ini:4` `[Profiles]` with `Names=dglider,default`
-- Per‑profile hotkey sections:
-  - `gesture_config.ini` → `[Profile_dglider_Hotkey_^!2]` → `up=fn:SelectProfile`
-  - `gesture_config.ini` → `[Profile_default_Hotkey_^!2]` ? `default={Enter}`
+## Built‑in Functions
 
-Functions to switch profile (bind via `fn:` like other actions):
+- `fn:SelectProfile` — open the profile selector GUI (two columns of buttons).
+- `fn:ProfilePrompt` — prompt to enter/select a profile by name.
+- `fn:TypeText` — prompt for text and type it raw.
+- `fn:SCI` — save clipboard image to `C:\EpsteinBackupDrive\SavedPictures\yyyy-MM-dd_HH-mm-ss.png`.
+- `fn:VolumeOSD` — show a simple volume OSD at the bottom‑left; use mouse wheel to adjust.
 
-- `fn:SelectProfile` cycles to the next profile in `[Profiles].Names` and saves it to `[Settings].ActiveProfile`.
-- `fn:ProfilePrompt` shows an input box to type/select a profile name.
+## Volume OSD Notes
+
+- When the OSD opens, the script enables wheel handling immediately to avoid missing the first wheel tick.
+- The wheel hotkeys are active only while OSD is open; they won’t interfere otherwise.
+
+## Tips
+
+- Use `{}` for “no action” to keep INI fields explicit and avoid parse quirks.
+- You can assign mouse buttons and keyboard combos in the same profile.
+- Logs live at Desktop\Log\gesture_log.txt for troubleshooting.
+
