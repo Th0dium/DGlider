@@ -373,3 +373,16 @@ return
 ProfSelGuiClose:
     Gui, ProfSel:Destroy
 return
+
+
+; This is for my personal use, delete it if you want
+; Japanese key remappings
+SC07B::Send, {Space}        ; First key = Spacebar
+SC079::Send, {Space}        ; Second key = Spacebar  
+SC070::Send, ^{Tab}         ; Third key = Ctrl+Tab 
+^SC07D::Send, ^{Backspace}  ; Always send Ctrl+Backspace
+SC07D::Send, {Backspace}    ; Always send Ctrl+Backspace
++SC07D::Send, {Backspace}  ; Always send Ctrl+Backspace
+
+
+SC073::Send, ^v             ; Fifth key = Ctrl+V
