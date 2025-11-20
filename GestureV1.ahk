@@ -379,7 +379,11 @@ return
 ; Japanese key remappings
 SC07B::Send, {Space}        ; First key = Spacebar
 SC079::Send, {Space}        ; Second key = Spacebar  
-SC070::Send, ^{Tab}         ; Third key = Ctrl+Tab 
+
+SC070::Send, {Backspace}    ; Always send Ctrl+Backspace
++SC070::Send, {Backspace}  ; Always send Ctrl+Backspace
+^SC070::Send, ^{Backspace}  ; Always send Ctrl+Backspace
+
 ^SC07D::Send, ^{Backspace}  ; Always send Ctrl+Backspace
 SC07D::Send, {Backspace}    ; Always send Ctrl+Backspace
 +SC07D::Send, {Backspace}  ; Always send Ctrl+Backspace
