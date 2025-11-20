@@ -23,43 +23,21 @@ if (_cfgThreshold != "")
 
 VolOSD_Active := 0
 
-; Initialize gesture hotkeys based on current profile
+; Initialize mouse-button hotkeys based on current profile
+SetupMouseButtonHotkeys()
+
+; Initialize dynamic mouse-button hotkeys based on current profile
 SetupMouseButtonHotkeys()
 
 ;--------------------------------- Key pickup ------------------------------------
 
-; Labels for dynamic hotkeys (Ctrl+Alt+1..8)
-HK_CTRLALT_1:
-    HandleMouseAction("^!1")
-return
-
-HK_CTRLALT_2:
-    HandleMouseAction("^!2")
-return
-
-HK_CTRLALT_3:
-    HandleMouseAction("^!3")
-return
-
-HK_CTRLALT_4:
-    HandleMouseAction("^!4")
-return
-
-HK_CTRLALT_5:
-    HandleMouseAction("^!5")
-return
-
-HK_CTRLALT_6:
-    HandleMouseAction("^!6")
-return
-
-HK_CTRLALT_7:
-    HandleMouseAction("^!7")
-return
-
-HK_CTRLALT_8:
-    HandleMouseAction("^!8")
-return
+^!1::HandleMouseAction("^!1")
+^!2::HandleMouseAction("^!2")
+^!3::HandleMouseAction("^!3")
+^!4::HandleMouseAction("^!4")
+^!5::HandleMouseAction("^!5")
+^!6::HandleMouseAction("^!6")
+^!7::HandleMouseAction("^!7")
 
 ; Mouse button gestures (managed dynamically by profile)
 ; Bindings are set via SetupMouseButtonHotkeys/ApplyProfileHotkeys.
@@ -73,14 +51,9 @@ RBUTTON_HOTKEY:
     HandleMouseAction("{rbutton}")
 return
 
-; Navigation buttons (dynamic)
-XBUTTON1_HOTKEY:
-    HandleMouseAction("{xbutton1}")
-return
-
-XBUTTON2_HOTKEY:
-    HandleMouseAction("{xbutton2}")
-return
+; Navigation buttons
+XButton1::HandleMouseAction("{xbutton1}")
+XButton2::HandleMouseAction("{xbutton2}")
 
 ; Global wheel hotkeys when Volume OSD is active
 #If (VolOSD_Active)
@@ -185,63 +158,20 @@ HandleMouseAction(hotkey) {
 ; Hotkey setup/toggle for mouse buttons (MButton/RButton) based on profile
 SetupMouseButtonHotkeys() {
     ; Assign labels once, then toggle On/Off per profile
-    ; Mouse buttons
     Hotkey, MButton, MBUTTON_HOTKEY
     Hotkey, RButton, RBUTTON_HOTKEY
-    ; Navigation buttons
-    Hotkey, XButton1, XBUTTON1_HOTKEY
-    Hotkey, XButton2, XBUTTON2_HOTKEY
-    ; Ctrl+Alt+1..8
-    Hotkey, ^!1, HK_CTRLALT_1
-    Hotkey, ^!2, HK_CTRLALT_2
-    Hotkey, ^!3, HK_CTRLALT_3
-    Hotkey, ^!4, HK_CTRLALT_4
-    Hotkey, ^!5, HK_CTRLALT_5
-    Hotkey, ^!6, HK_CTRLALT_6
-    Hotkey, ^!7, HK_CTRLALT_7
-    Hotkey, ^!8, HK_CTRLALT_8
     ApplyProfileHotkeys()
 }
 
 ApplyProfileHotkeys() {
     global ActiveProfile
-    disabled := GetProfileDisabledKeys(ActiveProfile)
-    ; Mouse buttons
-    Hotkey, MButton, % ShouldDisable(disabled, "{mbutton}") ? "Off" : "On"
-    Hotkey, RButton, % ShouldDisable(disabled, "{rbutton}") ? "Off" : "On"
-    ; Navigation buttons
-    Hotkey, XButton1, % ShouldDisable(disabled, "{xbutton1}") ? "Off" : "On"
-    Hotkey, XButton2, % ShouldDisable(disabled, "{xbutton2}") ? "Off" : "On"
-    ; Ctrl+Alt+1..8
-    Hotkey, ^!1, % ShouldDisable(disabled, "^!1") ? "Off" : "On"
-    Hotkey, ^!2, % ShouldDisable(disabled, "^!2") ? "Off" : "On"
-    Hotkey, ^!3, % ShouldDisable(disabled, "^!3") ? "Off" : "On"
-    Hotkey, ^!4, % ShouldDisable(disabled, "^!4") ? "Off" : "On"
-    Hotkey, ^!5, % ShouldDisable(disabled, "^!5") ? "Off" : "On"
-    Hotkey, ^!6, % ShouldDisable(disabled, "^!6") ? "Off" : "On"
-    Hotkey, ^!7, % ShouldDisable(disabled, "^!7") ? "Off" : "On"
-    Hotkey, ^!8, % ShouldDisable(disabled, "^!8") ? "Off" : "On"
-}
-
-ShouldDisable(disabledList, key) {
-    ; disabledList: comma-separated list (case-insensitive match)
-    ; key: literal like "^!1" or "{mbutton}"
-    StringLower, lk, key
-    StringLower, dl, disabledList
-    return InStr("," dl ",", "," lk ",")
-}
-
-; Return a comma-separated, lowercase list of disabled keys for a given profile
-GetProfileDisabledKeys(profile) {
-    IniRead, raw, %A_ScriptDir%\gesture_config.ini, Profile_%profile%_Disabled, Keys,
-    if (raw = "")
-        return ""
-    ; normalize separators and spaces, to lowercase
-    raw := StrReplace(raw, "|", ",")
-    raw := StrReplace(raw, ";", ",")
-    raw := StrReplace(raw, A_Space, "")
-    StringLower, raw, raw
-    return raw
+    if (ActiveProfile = "Off") {
+        Hotkey, MButton, Off
+        Hotkey, RButton, Off
+    } else {
+        Hotkey, MButton, On
+        Hotkey, RButton, On
+    }
 }
 
 ;----------------------------------- Functions -----------------------------------
