@@ -390,3 +390,128 @@ SC07D::Send, {Backspace}    ; Always send Ctrl+Backspace
 
 
 SC073::Send, ^v             ; Fifth key = Ctrl+V
+
+;----------------------------------- Timer OSD Function -----------------------------------
+
+TimerToggle() {
+    global Timer_State, Timer_StartTime, Timer_Accumulated, Timer_GuiHwnd, TimerDisplay, Timer_Visible
+
+    ; Initialize variables
+    if (Timer_State = "") {
+        Timer_State := 0        ; 0: Stopped/Paused, 1: Running
+        Timer_Accumulated := 0
+        Timer_Visible := 0
+    }
+
+    ; --- LOGIC: STOPPED -> START ---
+    if (Timer_State = 0 && Timer_Accumulated = 0) {
+        Timer_State := 1
+        Timer_StartTime := A_TickCount
+        Timer_Show()
+        Log("Timer Started")
+        return
+    }
+
+    ; --- LOGIC: PAUSED -> RESUME ---
+    if (Timer_State = 0 && Timer_Accumulated > 0) {
+        Timer_State := 1
+        Timer_StartTime := A_TickCount
+        Timer_Show()
+        Log("Timer Resumed")
+        return
+    }
+
+    ; --- LOGIC: RUNNING ---
+    if (Timer_State = 1) {
+        if (Timer_Visible) {
+            ; If Running AND Visible -> PAUSE
+            Timer_State := 0
+            Timer_Accumulated += (A_TickCount - Timer_StartTime)
+            
+            ; Visual feedback for Pause
+            Gui, TimerOSD:Font, cYellow
+            GuiControl, TimerOSD:Font, TimerDisplay
+            GuiControl, TimerOSD:, TimerDisplay, % FormatTimer(Timer_Accumulated)
+            
+            ; Keep visible for a bit then hide
+            SetTimer, TimerAutoHide, -4000
+            Log("Timer Paused")
+        } else {
+            ; If Running AND Hidden -> PEEK (Show briefly)
+            Timer_Show()
+            Log("Timer Peek")
+        }
+    }
+}
+
+Timer_Show() {
+    global Timer_GuiHwnd, TimerDisplay, Timer_Visible, Timer_State
+    
+    if (!Timer_GuiHwnd) {
+        Gui, TimerOSD:New, +AlwaysOnTop +ToolWindow -Caption +HwndTimer_GuiHwnd
+        Gui, TimerOSD:Color, 222222
+        Gui, TimerOSD:Font, s16 w700, Segoe UI
+        Gui, TimerOSD:Add, Text, vTimerDisplay c00FF00 Center w180, 00:00:00
+    }
+    
+    ; Reset color to Green if running
+    if (Timer_State = 1) {
+        Gui, TimerOSD:Font, c00FF00
+        GuiControl, TimerOSD:Font, TimerDisplay
+    }
+
+    ; Update immediately before showing
+    GoSub, TimerUpdateLoop
+
+    Gui, TimerOSD:Show, NoActivate x50 y50, TimerOSD
+    Timer_Visible := 1
+    
+    ; Start updating loop
+    SetTimer, TimerUpdateLoop, 100
+    
+    ; Auto hide after 3 seconds (Peek mode)
+    SetTimer, TimerAutoHide, -3000
+}
+
+TimerUpdateLoop:
+    if (Timer_State = 1) {
+        CurrentDuration := (A_TickCount - Timer_StartTime) + Timer_Accumulated
+        GuiControl, TimerOSD:, TimerDisplay, % FormatTimer(CurrentDuration)
+    }
+return
+
+TimerAutoHide:
+    Gui, TimerOSD:Hide
+    Timer_Visible := 0
+    ; Don't stop the loop if running, just stop updating UI? 
+    ; Actually, we can keep loop running or stop it to save CPU. 
+    ; Let's stop UI updates to save resources if hidden.
+    if (Timer_State = 1) {
+        SetTimer, TimerUpdateLoop, Off 
+    }
+return
+
+FormatTimer(ms) {
+    totalSec := Floor(ms / 1000)
+    hours := Floor(totalSec / 3600)
+    rem := Mod(totalSec, 3600)
+    mins := Floor(rem / 60)
+    secs := Mod(rem, 60)
+    
+    ; Format HH:MM:SS
+    hrStr := (hours < 10) ? "0" . hours : hours
+    minStr := (mins < 10) ? "0" . mins : mins
+    secStr := (secs < 10) ? "0" . secs : secs
+    return hrStr . ":" . minStr . ":" . secStr
+}
+
+TimerReset() {
+    global Timer_State, Timer_Accumulated, Timer_Visible
+    Timer_State := 0
+    Timer_Accumulated := 0
+    GuiControl, TimerOSD:, TimerDisplay, 00:00:00
+    Gui, TimerOSD:Hide
+    Timer_Visible := 0
+    SetTimer, TimerUpdateLoop, Off
+    Log("Timer reset")
+}
