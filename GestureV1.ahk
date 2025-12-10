@@ -8,7 +8,7 @@ SetWorkingDir, %A_ScriptDir%
 
 SysGet, screenWidth, 78
 SysGet, screenHeight, 79
-MoveThreshold := 30 ;   
+MoveThreshold := 30 ;
 
 ; Profile support
 ActiveProfile := "dglider"
@@ -38,6 +38,8 @@ SetupMouseButtonHotkeys()
 ^!5::HandleMouseAction("^!5")
 ^!6::HandleMouseAction("^!6")
 ^!7::HandleMouseAction("^!7")
+^!8::HandleMouseAction("^!8")
+^!9::HandleMouseAction("^!9")
 
 ; Mouse button gestures (managed dynamically by profile)
 ; Bindings are set via SetupMouseButtonHotkeys/ApplyProfileHotkeys.
@@ -58,7 +60,7 @@ XButton2::HandleMouseAction("{xbutton2}")
 ; Global wheel hotkeys when Volume OSD is active
 #If (VolOSD_Active)
     WheelUp::VolumeOSD_Wheel(1)
-WheelDown::VolumeOSD_Wheel(-1)
+    WheelDown::VolumeOSD_Wheel(-1)
 #If
 
 ;------------------------------- Gesture Dispatch --------------------------------
@@ -87,7 +89,7 @@ getAction(hotkey, direction) {
         return value2
     ; 3) Legacy fallback: plain <direction>
     IniRead, value3, %A_ScriptDir%\gesture_config.ini, Hotkey_%hotkey%, %direction%,
-return value3
+    return value3
 }
 
 WaitHotkeyRelease(hotkey) {
@@ -290,7 +292,7 @@ GetProfiles() {
     IniRead, names, %A_ScriptDir%\gesture_config.ini, Profiles, Names, default
     if (names = "")
         names := "default"
-return names
+    return names
 }
 
 ProfileSet(name) {
@@ -374,11 +376,10 @@ ProfSelGuiClose:
     Gui, ProfSel:Destroy
 return
 
-
 ; This is for my personal use, delete it if you want
 ; Japanese key remappings
 SC07B::Send, {Space}        ; First key = Spacebar
-SC079::Send, {Space}        ; Second key = Spacebar  
+SC079::Send, {Space}        ; Second key = Spacebar
 
 SC070::Send, {Backspace}    ; Always send Ctrl+Backspace
 +SC070::Send, {Backspace}  ; Always send Ctrl+Backspace
@@ -387,7 +388,6 @@ SC070::Send, {Backspace}    ; Always send Ctrl+Backspace
 ^SC07D::Send, ^{Backspace}  ; Always send Ctrl+Backspace
 SC07D::Send, {Backspace}    ; Always send Ctrl+Backspace
 +SC07D::Send, {Backspace}  ; Always send Ctrl+Backspace
-
 
 SC073::Send, ^v             ; Fifth key = Ctrl+V
 
@@ -427,12 +427,12 @@ TimerToggle() {
             ; If Running AND Visible -> PAUSE
             Timer_State := 0
             Timer_Accumulated += (A_TickCount - Timer_StartTime)
-            
+
             ; Visual feedback for Pause
             Gui, TimerOSD:Font, cYellow
             GuiControl, TimerOSD:Font, TimerDisplay
             GuiControl, TimerOSD:, TimerDisplay, % FormatTimer(Timer_Accumulated)
-            
+
             ; Keep visible for a bit then hide
             SetTimer, TimerAutoHide, -4000
             Log("Timer Paused")
@@ -446,14 +446,14 @@ TimerToggle() {
 
 Timer_Show() {
     global Timer_GuiHwnd, TimerDisplay, Timer_Visible, Timer_State
-    
+
     if (!Timer_GuiHwnd) {
         Gui, TimerOSD:New, +AlwaysOnTop +ToolWindow -Caption +HwndTimer_GuiHwnd
         Gui, TimerOSD:Color, 222222
         Gui, TimerOSD:Font, s16 w700, Segoe UI
         Gui, TimerOSD:Add, Text, vTimerDisplay c00FF00 Center w180, 00:00:00
     }
-    
+
     ; Reset color to Green if running
     if (Timer_State = 1) {
         Gui, TimerOSD:Font, c00FF00
@@ -465,10 +465,10 @@ Timer_Show() {
 
     Gui, TimerOSD:Show, NoActivate x50 y50, TimerOSD
     Timer_Visible := 1
-    
+
     ; Start updating loop
     SetTimer, TimerUpdateLoop, 100
-    
+
     ; Auto hide after 3 seconds (Peek mode)
     SetTimer, TimerAutoHide, -3000
 }
@@ -483,11 +483,11 @@ return
 TimerAutoHide:
     Gui, TimerOSD:Hide
     Timer_Visible := 0
-    ; Don't stop the loop if running, just stop updating UI? 
-    ; Actually, we can keep loop running or stop it to save CPU. 
+    ; Don't stop the loop if running, just stop updating UI?
+    ; Actually, we can keep loop running or stop it to save CPU.
     ; Let's stop UI updates to save resources if hidden.
     if (Timer_State = 1) {
-        SetTimer, TimerUpdateLoop, Off 
+        SetTimer, TimerUpdateLoop, Off
     }
 return
 
@@ -497,7 +497,7 @@ FormatTimer(ms) {
     rem := Mod(totalSec, 3600)
     mins := Floor(rem / 60)
     secs := Mod(rem, 60)
-    
+
     ; Format HH:MM:SS
     hrStr := (hours < 10) ? "0" . hours : hours
     minStr := (mins < 10) ? "0" . mins : mins
