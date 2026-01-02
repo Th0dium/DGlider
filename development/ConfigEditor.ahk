@@ -1,37 +1,58 @@
+; ============================================================================
+; DGlider Configuration Editor
+; ============================================================================
+; A GUI tool for managing gesture button configurations.
+; Allows users to add, edit, and delete button mappings with directional actions.
+; ============================================================================
+
 #NoEnv
 #SingleInstance Force
 SendMode, Input
 SetWorkingDir, %A_ScriptDir%
 
+; ----------------------------------------------------------------------------
+; Global Variables
+; ----------------------------------------------------------------------------
 global ConfigFile := A_ScriptDir "\gesture_config.ini"
-global CurrentHotkey := ""
-global HotkeyList := []
-global PendingChanges := {}
+global CurrentHotkey := "" ; Currently selected button in the list
+global HotkeyList := [] ; Array of all configured buttons
+global PendingChanges := {} ; Unsaved changes (stored as mode codes: R/T/H)
 
 Gosub, BuildGUI
 return
+
+; ============================================================================
+; GUI CONSTRUCTION
+; ============================================================================
 
 BuildGUI:
     Gui, Config:New, +Resize, DGlider Config Editor
     Gui, Config:Color, F0F0F0
 
+    ; --- Left Panel: Button List ---
     Gui, Config:Add, Text, x10 y10 w200, Buttons:
     Gui, Config:Add, ListBox, x10 y30 w200 h350 vHotkeyListBox gOnHotkeySelect, 
 
+    ; --- Left Panel: Global Settings ---
     Gui, Config:Add, GroupBox, x10 y390 w200 h80, Settings
     Gui, Config:Add, Text, x20 y410, Move Threshold:
     Gui, Config:Add, Edit, x20 y430 w80 vMoveThreshold Number
     Gui, Config:Add, UpDown, Range10-100, 30
+    Gui, Config:Add, Button, x115 y428 w85 h25 gRearrangeButtons, Rearrange
 
+    ; --- Right Panel: Button Properties ---
     Gui, Config:Add, GroupBox, x220 y10 w380 h340, Button Properties
 
+    ; Mode Selection (R=Pull and Release, T=On Tap, H=Pull and Hold)
     Gui, Config:Add, Text, x230 y35, Button Mode:
     Gui, Config:Add, DropDownList, x330 y32 w150 vButtonMode gOnModeChange, Pull and Release|On Tap|Pull and Hold
 
+    ; Aim Delay (only visible for "Pull and Hold" mode)
     Gui, Config:Add, Text, x230 y65 vAimDelayLabel Hidden, Aim Delay (ms):
     Gui, Config:Add, Edit, x330 y62 w80 vAimDelay Number Hidden
     Gui, Config:Add, UpDown, vAimDelayUpDown Range50-1000 Hidden, 150
 
+    ; --- Direction Actions ---
     Gui, Config:Add, GroupBox, x230 y105 w360 h210, Direction Actions
 
     yPos := 130
@@ -54,11 +75,13 @@ BuildGUI:
     Gui, Config:Add, Text, x250 y%yPos%, Default:
     Gui, Config:Add, Edit, x320 y%yPos% w260 vActionDefault
 
+    ; --- Action Buttons ---
     Gui, Config:Add, Button, x220 y380 w90 h35 gSaveConfig Default, Save Config
     Gui, Config:Add, Button, x320 y380 w90 h35 gReloadConfig, Reload
     Gui, Config:Add, Button, x420 y380 w90 h35 gAddHotkey, Add Button
     Gui, Config:Add, Button, x520 y380 w80 h35 gDeleteHotkey cRed, Delete
 
+    ; --- Help Text ---
     Gui, Config:Add, Text, x220 y425 w380 cGray, Tip: Use {key} syntax for keys, ^=Ctrl !=Alt +=Shift #=Win
 
     LoadConfig()
@@ -66,25 +89,30 @@ BuildGUI:
     Gui, Config:Show, w610 h490
 return
 
+; ============================================================================
+; EVENT HANDLERS
+; ============================================================================
+
+; Called when user selects a button from the list
 OnHotkeySelect:
     Gui, Config:Submit, NoHide
 
+    ; Save any pending changes for the previously selected button
     if (CurrentHotkey != "") {
         SaveCurrentChanges()
     }
 
+    ; Load data for the newly selected button
     GuiControlGet, selectedIndex, Config:, HotkeyListBox
     if (selectedIndex > 0) {
         GuiControlGet, selectedText, Config:, HotkeyListBox
-        spacePos := InStr(selectedText, " ")
-        if (spacePos > 0)
-            CurrentHotkey := SubStr(selectedText, 1, spacePos - 1)
-        else
-            CurrentHotkey := selectedText
+        CurrentHotkey := selectedText
         LoadHotkeyData(CurrentHotkey)
     }
 return
 
+; Called when user changes the button mode dropdown
+; Shows/hides AimDelay control based on mode
 OnModeChange:
     Gui, Config:Submit, NoHide
     if (ButtonMode = "Pull and Hold") {
@@ -98,6 +126,11 @@ OnModeChange:
     }
 return
 
+; ============================================================================
+; SAVE / RELOAD OPERATIONS
+; ============================================================================
+
+; Save all pending changes to the INI file
 SaveConfig:
     Gui, Config:Submit, NoHide
 
@@ -108,13 +141,16 @@ SaveConfig:
 
     SaveCurrentChanges()
 
+    ; Save global settings
     IniWrite, %MoveThreshold%, %ConfigFile%, Settings, MoveThreshold
 
+    ; Save each button's configuration
     for hotkey, data in PendingChanges {
         section := "Hotkey_" . hotkey
         storedMode := ConvertModeToStored(data.mode)
         IniWrite, %storedMode%, %ConfigFile%, %section%, mode
 
+        ; Only save aim_delay for "Pull and Hold" mode
         if (storedMode = "H") {
             IniWrite, % data.aim_delay, %ConfigFile%, %section%, aim_delay
         }
@@ -131,6 +167,7 @@ SaveConfig:
     RefreshHotkeyList()
 return
 
+; Discard all pending changes and reload from INI file
 ReloadConfig:
     PendingChanges := {}
 
@@ -140,10 +177,15 @@ ReloadConfig:
     }
 return
 
+; ============================================================================
+; ADD / DELETE BUTTON OPERATIONS
+; ============================================================================
+
 AddHotkey:
     Gosub, OpenKeyDetectionDialog
 return
 
+; Delete the currently selected button
 DeleteHotkey:
     global CurrentHotkey, HotkeyList, ConfigFile
 
@@ -156,6 +198,7 @@ DeleteHotkey:
     if (ErrorLevel = 2)
         return
 
+    ; Remove from HotkeyList array
     for index, hk in HotkeyList {
         if (hk = CurrentHotkey) {
             HotkeyList.RemoveAt(index)
@@ -163,9 +206,11 @@ DeleteHotkey:
         }
     }
 
+    ; Delete from INI file
     section := "Hotkey_" . CurrentHotkey
     IniDelete, %ConfigFile%, %section%
 
+    ; Clear the form
     CurrentHotkey := ""
     GuiControl, Config:, HotkeyListBox, 
     GuiControl, Config:, ActionUp, 
@@ -177,6 +222,164 @@ DeleteHotkey:
     RefreshHotkeyList()
 return
 
+; ============================================================================
+; REARRANGE BUTTONS
+; ============================================================================
+
+; Opens a dialog to rearrange button order
+RearrangeButtons:
+    global HotkeyList, ConfigFile
+
+    if (HotkeyList.Count() <= 1) {
+        MsgBox, 48, Info, You need at least 2 buttons to rearrange!
+        return
+    }
+
+    Gui, Rearrange:New, +AlwaysOnTop, Rearrange Buttons
+    Gui, Rearrange:Color, F0F0F0
+
+    Gui, Rearrange:Add, Text, x10 y10 w280, Drag items to rearrange order:
+    Gui, Rearrange:Add, ListBox, x10 y35 w280 h200 vRearrangeListBox, 
+
+    Gui, Rearrange:Add, Button, x10 y245 w60 h30 gRearrangeMoveUp, Move Up
+    Gui, Rearrange:Add, Button, x75 y245 w70 h30 gRearrangeMoveDown, Move Down
+    Gui, Rearrange:Add, Button, x150 y245 w60 h30 gRearrangeApply Default, Apply
+    Gui, Rearrange:Add, Button, x215 y245 w75 h30 gRearrangeCancel, Cancel
+
+    ; Populate list
+    listStr := ""
+    for index, hk in HotkeyList {
+        listStr .= hk "|"
+    }
+    GuiControl, Rearrange:, RearrangeListBox, |%listStr%
+
+    Gui, Rearrange:Show, w300 h290
+return
+
+; Move selected item up
+RearrangeMoveUp:
+    GuiControlGet, selectedIndex, Rearrange:, RearrangeListBox
+    if (selectedIndex <= 1) {
+        MsgBox, 48, Info, Cannot move first item up!
+        return
+    }
+
+    ; Get the item
+    GuiControl, Rearrange:, RearrangeListBox, -Redraw
+    GuiControlGet, item, Rearrange:, RearrangeListBox
+
+    ; Update array
+    temp := HotkeyList[selectedIndex]
+    HotkeyList[selectedIndex] := HotkeyList[selectedIndex - 1]
+    HotkeyList[selectedIndex - 1] := temp
+
+    ; Refresh list
+    listStr := ""
+    for index, hk in HotkeyList {
+        listStr .= hk "|"
+    }
+    GuiControl, Rearrange:, RearrangeListBox, |%listStr%
+    GuiControl, Rearrange:, RearrangeListBox, +Redraw
+    GuiControl, Rearrange:Choose, RearrangeListBox, % selectedIndex - 1
+return
+
+; Move selected item down
+RearrangeMoveDown:
+    GuiControlGet, selectedIndex, Rearrange:, RearrangeListBox
+    if (selectedIndex >= HotkeyList.Count()) {
+        MsgBox, 48, Info, Cannot move last item down!
+        return
+    }
+
+    ; Update array
+    temp := HotkeyList[selectedIndex]
+    HotkeyList[selectedIndex] := HotkeyList[selectedIndex + 1]
+    HotkeyList[selectedIndex + 1] := temp
+
+    ; Refresh list
+    listStr := ""
+    for index, hk in HotkeyList {
+        listStr .= hk "|"
+    }
+    GuiControl, Rearrange:, RearrangeListBox, |%listStr%
+    GuiControl, Rearrange:Choose, RearrangeListBox, % selectedIndex + 1
+return
+
+; Apply new order to INI file
+RearrangeApply:
+    global HotkeyList, ConfigFile, PendingChanges
+
+    ; Get all data from INI first
+    buttonData := {}
+    for index, hotkey in HotkeyList {
+        section := "Hotkey_" . hotkey
+
+        IniRead, mode, %ConfigFile%, %section%, mode, R
+        IniRead, aimDelay, %ConfigFile%, %section%, aim_delay, 150
+        IniRead, up, %ConfigFile%, %section%, up, %A_Space%
+        IniRead, down, %ConfigFile%, %section%, down, %A_Space%
+        IniRead, left, %ConfigFile%, %section%, left, %A_Space%
+        IniRead, right, %ConfigFile%, %section%, right, %A_Space%
+        IniRead, def, %ConfigFile%, %section%, default, %A_Space%
+
+        buttonData[hotkey] := {mode: mode, aim_delay: aimDelay, up: up, down: down, left: left, right: right, default: def}
+    }
+
+    ; Rebuild INI file by deleting and rewriting sections in new order
+    fileContent := ""
+    IniRead, fileContent, %ConfigFile%
+
+    ; Get settings section
+    IniRead, settings, %ConfigFile%, Settings
+
+    ; Rewrite entire file with new button order
+    tempFile := ConfigFile . ".tmp"
+    FileDelete, %tempFile%
+    FileAppend, [Settings]`n, %tempFile%
+    IniRead, moveThreshold, %ConfigFile%, Settings, MoveThreshold, 30
+    FileAppend, MoveThreshold=%moveThreshold%`n`n, %tempFile%
+
+    ; Append buttons in new order
+    for index, hotkey in HotkeyList {
+        data := buttonData[hotkey]
+        section := "Hotkey_" . hotkey
+        mode := data.mode
+        aimDelay := data.aim_delay
+        up := data.up
+        down := data.down
+        left := data.left
+        right := data.right
+        def := data.default
+
+        FileAppend, [%section%]`n, %tempFile%
+        FileAppend, mode=%mode%`n, %tempFile%
+        FileAppend, aim_delay=%aimDelay%`n, %tempFile%
+        FileAppend, up=%up%`n, %tempFile%
+        FileAppend, down=%down%`n, %tempFile%
+        FileAppend, left=%left%`n, %tempFile%
+        FileAppend, right=%right%`n, %tempFile%
+        FileAppend, default=%def%`n`n, %tempFile%
+    }
+
+    ; Replace original file
+    FileDelete, %ConfigFile%
+    FileMove, %tempFile%, %ConfigFile%
+
+    PendingChanges := {}
+    gosub, RearrangeCancel
+    RefreshHotkeyList()
+    MsgBox, 64, Success, Button order updated!
+return
+
+RearrangeCancel:
+    Gui, Rearrange:Destroy
+return
+
+; ============================================================================
+; KEY DETECTION DIALOG
+; ============================================================================
+
+; Opens a dialog to detect which key/button the user presses
 OpenKeyDetectionDialog:
     global DetectedKey, DetectCtrl, DetectShift, DetectAlt, DetectWin
 
@@ -192,6 +395,7 @@ OpenKeyDetectionDialog:
     Gui, KeyDetect:Add, Text, x20 y15 w260 h40 cBlue, Press a button or key...
     Gui, KeyDetect:Add, Edit, x20 y60 w260 h35 vDetectedKeyDisplay cGray ReadOnly
 
+    ; Modifier checkboxes
     Gui, KeyDetect:Add, Text, x20 y105 w260, Modifiers:
     Gui, KeyDetect:Add, CheckBox, x20 y125 w60 vDetectCtrl, Ctrl
     Gui, KeyDetect:Add, CheckBox, x90 y125 w60 vDetectShift, Shift
@@ -209,40 +413,48 @@ OpenKeyDetectionDialog:
     gosub, StartKeyListener
 return
 
+; Enable hotkey detection for supported keys
 StartKeyListener:
     global DetectedKey, DetectedKeyDisplay
 
+    ; Mouse buttons (excluding LButton)
     Hotkey, RButton, OnKeyDetected, On
     Hotkey, MButton, OnKeyDetected, On
     Hotkey, XButton1, OnKeyDetected, On
     Hotkey, XButton2, OnKeyDetected, On
 
+    ; Letter keys A-Z
     Loop, 26 {
         key := Chr(64 + A_Index)
         Hotkey, %key%, OnKeyDetected, On
     }
 
+    ; Number keys 0-9
     Loop, 10 {
         key := A_Index - 1
         Hotkey, %key%, OnKeyDetected, On
     }
 
+    ; Function keys F1-F12
     Loop, 12 {
         key := "F" . A_Index
         Hotkey, %key%, OnKeyDetected, On
     }
 
+    ; Special keys
     specialKeys := ["Space", "Enter", "Escape", "Tab", "BackSpace", "Delete", "Insert", "Home", "End", "PgUp", "PgDn", "Up", "Down", "Left", "Right", "PrintScreen", "Pause", "CapsLock", "NumLock", "ScrollLock"]
     for index, key in specialKeys {
         Hotkey, %key%, OnKeyDetected, On
     }
 return
 
+; Called when a key is detected - updates the display with key and modifiers
 OnKeyDetected:
     global DetectedKey, DetectCtrl, DetectShift, DetectAlt, DetectWin, DetectedKeyDisplay
 
     DetectedKey := A_ThisHotkey
 
+    ; Check which modifiers are held and update checkboxes
     displayStr := ""
     if (GetKeyState("LCtrl") || GetKeyState("RCtrl")) {
         displayStr .= "Ctrl + "
@@ -265,6 +477,7 @@ OnKeyDetected:
     GuiControl, KeyDetect:, DetectedKeyDisplay, %displayStr%
 return
 
+; Confirm the detected key and create a new button entry
 ConfirmKey:
     global DetectedKey, HotkeyList, ConfigFile
 
@@ -275,6 +488,7 @@ ConfirmKey:
         return
     }
 
+    ; Build the hotkey string with modifiers (^=Ctrl, +=Shift, !=Alt, #=Win)
     finalHotkey := ""
     if (DetectCtrl)
         finalHotkey .= "^"
@@ -288,6 +502,7 @@ ConfirmKey:
 
     normalizedHotkey := finalHotkey
 
+    ; Check if button already exists
     found := false
     for index, hk in HotkeyList {
         if (hk = normalizedHotkey) {
@@ -296,10 +511,12 @@ ConfirmKey:
         }
     }
 
+    ; Add new button to list and INI file
     if (!found) {
         HotkeyList.Push(normalizedHotkey)
         RefreshHotkeyList()
 
+        ; Add blank line before new section for readability
         FileAppend, `n, %ConfigFile%
         section := "Hotkey_" . normalizedHotkey
         IniWrite, R, %ConfigFile%, %section%, mode
@@ -321,6 +538,7 @@ CancelKey:
     Gui, KeyDetect:Destroy
 return
 
+; Disable all hotkey listeners
 StopKeyListener:
     Hotkey, RButton, Off
     Hotkey, MButton, Off
@@ -348,6 +566,10 @@ StopKeyListener:
     }
 return
 
+; ============================================================================
+; GUI CLOSE HANDLERS
+; ============================================================================
+
 KeyDetectGuiClose:
 KeyDetectGuiEscape:
     gosub, StopKeyListener
@@ -359,6 +581,11 @@ ConfigGuiEscape:
 ExitApp
 return
 
+; ============================================================================
+; HELPER FUNCTIONS
+; ============================================================================
+
+; Store current form values to PendingChanges (converts display mode to stored code)
 SaveCurrentChanges() {
     global CurrentHotkey, PendingChanges, ButtonMode, AimDelay
     global ActionUp, ActionDown, ActionLeft, ActionRight, ActionDefault
@@ -378,6 +605,7 @@ SaveCurrentChanges() {
     PendingChanges[CurrentHotkey].default := ActionDefault
 }
 
+; Load all buttons from INI file into HotkeyList
 LoadConfig() {
     global ConfigFile, HotkeyList, MoveThreshold
 
@@ -386,6 +614,7 @@ LoadConfig() {
 
     HotkeyList := []
 
+    ; Find all sections starting with "Hotkey_"
     IniRead, sections, %ConfigFile%
     Loop, Parse, sections, `n
     {
@@ -398,6 +627,7 @@ LoadConfig() {
     RefreshHotkeyList()
 }
 
+; Update the ListBox with current HotkeyList
 RefreshHotkeyList() {
     global HotkeyList, ConfigFile
 
@@ -409,16 +639,15 @@ RefreshHotkeyList() {
     GuiControl, Config:, HotkeyListBox, |%listStr%
 }
 
+; Load a specific button's data into the form fields
+; Checks PendingChanges first, then falls back to INI file
 LoadHotkeyData(hotkey) {
     global ConfigFile, PendingChanges
-
-    spacePos := InStr(hotkey, " ")
-    if (spacePos > 0)
-        hotkey := SubStr(hotkey, 1, spacePos - 1)
 
     hotkey := Trim(hotkey)
     section := "Hotkey_" . hotkey
 
+    ; Load from PendingChanges if available, otherwise from INI
     if (PendingChanges.HasKey(hotkey)) {
         mode := PendingChanges[hotkey].mode
         aimDelay := PendingChanges[hotkey].aim_delay
@@ -443,11 +672,14 @@ LoadHotkeyData(hotkey) {
         def := Trim(def)
     }
 
+    ; Convert stored mode code to display name
     displayMode := ConvertModeToDisplay(mode)
 
+    ; Update form controls
     GuiControl, Config:ChooseString, ButtonMode, %displayMode%
     GuiControl, Config:, AimDelay, %aimDelay%
 
+    ; Show/hide AimDelay based on mode
     if (displayMode = "Pull and Hold") {
         GuiControl, Config:Show, AimDelayLabel
         GuiControl, Config:Show, AimDelay
@@ -465,6 +697,13 @@ LoadHotkeyData(hotkey) {
     GuiControl, Config:, ActionDefault, %def%
 }
 
+; ============================================================================
+; MODE CONVERSION FUNCTIONS
+; ============================================================================
+; INI stores: R (Pull and Release), T (On Tap), H (Pull and Hold)
+; GUI displays: "Pull and Release", "On Tap", "Pull and Hold"
+
+; Convert stored mode code to display name
 ConvertModeToDisplay(storedMode) {
     if (storedMode = "R")
         return "Pull and Release"
@@ -476,6 +715,7 @@ ConvertModeToDisplay(storedMode) {
         return "Pull and Release"
 }
 
+; Convert display name to stored mode code
 ConvertModeToStored(displayMode) {
     if (displayMode = "Pull and Release")
         return "R"
