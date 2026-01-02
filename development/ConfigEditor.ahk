@@ -1,52 +1,40 @@
-;------------------------------------- Config Editor GUI -------------------------------------
 #NoEnv
 #SingleInstance Force
 SendMode, Input
 SetWorkingDir, %A_ScriptDir%
 
-; Global variables
 global ConfigFile := A_ScriptDir "\gesture_config.ini"
 global CurrentHotkey := ""
 global HotkeyList := []
-global PendingChanges := {} ; Store unsaved changes
+global PendingChanges := {}
 
-; Launch GUI
 Gosub, BuildGUI
 return
-
-;------------------------------------- GUI Construction -------------------------------------
 
 BuildGUI:
     Gui, Config:New, +Resize, DGlider Config Editor
     Gui, Config:Color, F0F0F0
 
-    ; Left Panel - Button List
     Gui, Config:Add, Text, x10 y10 w200, Buttons:
-    Gui, Config:Add, ListBox, x10 y30 w200 h400 vHotkeyListBox gOnHotkeySelect, 
+    Gui, Config:Add, ListBox, x10 y30 w200 h350 vHotkeyListBox gOnHotkeySelect, 
 
-    ; Settings Section
-    Gui, Config:Add, GroupBox, x10 y440 w200 h80, Settings
-    Gui, Config:Add, Text, x20 y460, Move Threshold:
-    Gui, Config:Add, Edit, x20 y480 w80 vMoveThreshold Number
+    Gui, Config:Add, GroupBox, x10 y390 w200 h80, Settings
+    Gui, Config:Add, Text, x20 y410, Move Threshold:
+    Gui, Config:Add, Edit, x20 y430 w80 vMoveThreshold Number
     Gui, Config:Add, UpDown, Range10-100, 30
 
-    ; Right Panel - Button Properties
-    Gui, Config:Add, GroupBox, x220 y10 w380 h320, Button Properties
+    Gui, Config:Add, GroupBox, x220 y10 w380 h340, Button Properties
 
-    ; Button Mode
     Gui, Config:Add, Text, x230 y35, Button Mode:
-    Gui, Config:Add, DropDownList, x330 y32 w150 vButtonMode gOnModeChange, gesture||click|aim
+    Gui, Config:Add, DropDownList, x330 y32 w150 vButtonMode gOnModeChange, Pull and Release|On Tap|Pull and Hold
 
-    ; Aim Delay (only for aim mode)
     Gui, Config:Add, Text, x230 y65 vAimDelayLabel Hidden, Aim Delay (ms):
     Gui, Config:Add, Edit, x330 y62 w80 vAimDelay Number Hidden
     Gui, Config:Add, UpDown, vAimDelayUpDown Range50-1000 Hidden, 150
 
-    ; Gesture Directions
-    Gui, Config:Add, GroupBox, x230 y95 w360 h220, Direction Actions
+    Gui, Config:Add, GroupBox, x230 y105 w360 h210, Direction Actions
 
-    ; Direction inputs
-    yPos := 120
+    yPos := 130
     Gui, Config:Add, Text, x250 y%yPos%, Up:
     Gui, Config:Add, Edit, x320 y%yPos% w260 vActionUp
 
@@ -66,41 +54,28 @@ BuildGUI:
     Gui, Config:Add, Text, x250 y%yPos%, Default:
     Gui, Config:Add, Edit, x320 y%yPos% w260 vActionDefault
 
-    ; Preview/Test Section
-    Gui, Config:Add, GroupBox, x220 y340 w380 h100, Testing
-    Gui, Config:Add, Text, x230 y365, Test your gestures here:
-    Gui, Config:Add, Button, x230 y390 w150 h30 gTestGesture, Test Gesture Mode
-    Gui, Config:Add, Text, x390 y395 w200 vTestStatus cGray, Ready
+    Gui, Config:Add, Button, x220 y380 w90 h35 gSaveConfig Default, Save Config
+    Gui, Config:Add, Button, x320 y380 w90 h35 gReloadConfig, Reload
+    Gui, Config:Add, Button, x420 y380 w90 h35 gAddHotkey, Add Button
+    Gui, Config:Add, Button, x520 y380 w80 h35 gDeleteHotkey cRed, Delete
 
-    ; Action Buttons
-    Gui, Config:Add, Button, x220 y450 w120 h35 gSaveConfig Default, Save Config
-    Gui, Config:Add, Button, x350 y450 w120 h35 gReloadConfig, Reload
-    Gui, Config:Add, Button, x480 y450 w120 h35 gAddHotkey, Add Button
+    Gui, Config:Add, Text, x220 y425 w380 cGray, Tip: Use {key} syntax for keys, ^=Ctrl !=Alt +=Shift #=Win
 
-    ; Help text
-    Gui, Config:Add, Text, x220 y495 w380 cGray, Tip: Use {key} syntax for keys, ^=Ctrl !=Alt +=Shift #=Win
-
-    ; Load initial data
     LoadConfig()
 
-    Gui, Config:Show, w610 h530
+    Gui, Config:Show, w610 h490
 return
-
-;------------------------------------- Event Handlers -------------------------------------
 
 OnHotkeySelect:
     Gui, Config:Submit, NoHide
 
-    ; Save current changes before switching
     if (CurrentHotkey != "") {
         SaveCurrentChanges()
     }
 
     GuiControlGet, selectedIndex, Config:, HotkeyListBox
     if (selectedIndex > 0) {
-        ; Get the actual selected text from the ListBox
         GuiControlGet, selectedText, Config:, HotkeyListBox
-        ; Extract just the hotkey name (before the first space)
         spacePos := InStr(selectedText, " ")
         if (spacePos > 0)
             CurrentHotkey := SubStr(selectedText, 1, spacePos - 1)
@@ -112,7 +87,7 @@ return
 
 OnModeChange:
     Gui, Config:Submit, NoHide
-    if (ButtonMode = "aim") {
+    if (ButtonMode = "Pull and Hold") {
         GuiControl, Config:Show, AimDelayLabel
         GuiControl, Config:Show, AimDelay
         GuiControl, Config:Show, AimDelayUpDown
@@ -131,18 +106,16 @@ SaveConfig:
         return
     }
 
-    ; Save current form values to pending changes first
     SaveCurrentChanges()
 
-    ; Save settings
     IniWrite, %MoveThreshold%, %ConfigFile%, Settings, MoveThreshold
 
-    ; Save all pending changes to INI file
     for hotkey, data in PendingChanges {
         section := "Hotkey_" . hotkey
-        IniWrite, % data.mode, %ConfigFile%, %section%, mode
+        storedMode := ConvertModeToStored(data.mode)
+        IniWrite, %storedMode%, %ConfigFile%, %section%, mode
 
-        if (data.mode = "aim") {
+        if (storedMode = "H") {
             IniWrite, % data.aim_delay, %ConfigFile%, %section%, aim_delay
         }
 
@@ -153,124 +126,238 @@ SaveConfig:
         IniWrite, % data.default, %ConfigFile%, %section%, default
     }
 
-    ; Clear pending changes after save
     PendingChanges := {}
 
-    GuiControl, Config:, TestStatus, ✓ Saved successfully!
-
-    ; Refresh list to update action counts
     RefreshHotkeyList()
-
-    SetTimer, ClearStatus, -2000
 return
 
 ReloadConfig:
-    ; Clear pending changes
     PendingChanges := {}
 
     LoadConfig()
     if (CurrentHotkey != "") {
         LoadHotkeyData(CurrentHotkey)
     }
-    GuiControl, Config:, TestStatus, ✓ Config reloaded
-    SetTimer, ClearStatus, -2000
 return
 
 AddHotkey:
-    InputBox, newHotkey, Add Button, Enter button name (e.g. {rbutton}, {xbutton1}):, , 350, 150
-    if (ErrorLevel = 0 && newHotkey != "") {
-        ; Add to list if not exists
-        found := false
-        for index, hk in HotkeyList {
-            if (hk = newHotkey) {
-                found := true
-                break
-            }
+    Gosub, OpenKeyDetectionDialog
+return
+
+DeleteHotkey:
+    global CurrentHotkey, HotkeyList, ConfigFile
+
+    if (CurrentHotkey = "") {
+        MsgBox, 48, Warning, Please select a button first!
+        return
+    }
+
+    MsgBox, 4, Confirm Delete, Delete button "%CurrentHotkey%"?
+    if (ErrorLevel = 2)
+        return
+
+    for index, hk in HotkeyList {
+        if (hk = CurrentHotkey) {
+            HotkeyList.RemoveAt(index)
+            break
         }
+    }
 
-        if (!found) {
-            HotkeyList.Push(newHotkey)
-            RefreshHotkeyList()
+    section := "Hotkey_" . CurrentHotkey
+    IniDelete, %ConfigFile%, %section%
 
-            ; Set defaults
-            section := "Hotkey_" . newHotkey
-            IniWrite, gesture, %ConfigFile%, %section%, mode
-            IniWrite, %A_Space%, %ConfigFile%, %section%, up
-            IniWrite, %A_Space%, %ConfigFile%, %section%, down
-            IniWrite, %A_Space%, %ConfigFile%, %section%, left
-            IniWrite, %A_Space%, %ConfigFile%, %section%, right
-            IniWrite, %newHotkey%, %ConfigFile%, %section%, default
+    CurrentHotkey := ""
+    GuiControl, Config:, HotkeyListBox, 
+    GuiControl, Config:, ActionUp, 
+    GuiControl, Config:, ActionDown, 
+    GuiControl, Config:, ActionLeft, 
+    GuiControl, Config:, ActionRight, 
+    GuiControl, Config:, ActionDefault, 
 
-            GuiControl, Config:, TestStatus, ✓ Button added
-            SetTimer, ClearStatus, -2000
-        } else {
-            MsgBox, 48, Info, Button already exists!
-        }
+    RefreshHotkeyList()
+return
+
+OpenKeyDetectionDialog:
+    global DetectedKey, DetectCtrl, DetectShift, DetectAlt, DetectWin
+
+    DetectedKey := ""
+    DetectCtrl := 0
+    DetectShift := 0
+    DetectAlt := 0
+    DetectWin := 0
+
+    Gui, KeyDetect:New, +AlwaysOnTop, Key Detection
+    Gui, KeyDetect:Color, F0F0F0
+
+    Gui, KeyDetect:Add, Text, x20 y15 w260 h40 cBlue, Press a button or key...
+    Gui, KeyDetect:Add, Edit, x20 y60 w260 h35 vDetectedKeyDisplay cGray ReadOnly
+
+    Gui, KeyDetect:Add, Text, x20 y105 w260, Modifiers:
+    Gui, KeyDetect:Add, CheckBox, x20 y125 w60 vDetectCtrl, Ctrl
+    Gui, KeyDetect:Add, CheckBox, x90 y125 w60 vDetectShift, Shift
+    Gui, KeyDetect:Add, CheckBox, x160 y125 w60 vDetectAlt, Alt
+    Gui, KeyDetect:Add, CheckBox, x230 y125 w50 vDetectWin, Win
+
+    Gui, KeyDetect:Add, Button, x20 y165 w120 h35 gConfirmKey Default, Confirm
+    Gui, KeyDetect:Add, Button, x150 y165 w130 h35 gCancelKey, Cancel
+
+    Gui, KeyDetect:Add, Text, x20 y210 w260 cGray, Press any button/key below
+    Gui, KeyDetect:Add, Text, x20 y228 w260 cGray, to detect it, then confirm
+
+    Gui, KeyDetect:Show, w300 h280
+
+    gosub, StartKeyListener
+return
+
+StartKeyListener:
+    global DetectedKey, DetectedKeyDisplay
+
+    Hotkey, RButton, OnKeyDetected, On
+    Hotkey, MButton, OnKeyDetected, On
+    Hotkey, XButton1, OnKeyDetected, On
+    Hotkey, XButton2, OnKeyDetected, On
+
+    Loop, 26 {
+        key := Chr(64 + A_Index)
+        Hotkey, %key%, OnKeyDetected, On
+    }
+
+    Loop, 10 {
+        key := A_Index - 1
+        Hotkey, %key%, OnKeyDetected, On
+    }
+
+    Loop, 12 {
+        key := "F" . A_Index
+        Hotkey, %key%, OnKeyDetected, On
+    }
+
+    specialKeys := ["Space", "Enter", "Escape", "Tab", "BackSpace", "Delete", "Insert", "Home", "End", "PgUp", "PgDn", "Up", "Down", "Left", "Right", "PrintScreen", "Pause", "CapsLock", "NumLock", "ScrollLock"]
+    for index, key in specialKeys {
+        Hotkey, %key%, OnKeyDetected, On
     }
 return
 
-TestGesture:
-    GuiControl, Config:, TestStatus, Testing... perform a gesture
+OnKeyDetected:
+    global DetectedKey, DetectCtrl, DetectShift, DetectAlt, DetectWin, DetectedKeyDisplay
 
-    ; Start gesture test
-    Hotkey, RButton, TestGestureHandler, On
-    Hotkey, XButton1, TestGestureHandler, On
-    Hotkey, XButton2, TestGestureHandler, On
+    DetectedKey := A_ThisHotkey
 
-    ; Auto-disable after 10 seconds
-    SetTimer, DisableGestureTest, -10000
+    displayStr := ""
+    if (GetKeyState("LCtrl") || GetKeyState("RCtrl")) {
+        displayStr .= "Ctrl + "
+        DetectCtrl := 1
+    }
+    if (GetKeyState("LShift") || GetKeyState("RShift")) {
+        displayStr .= "Shift + "
+        DetectShift := 1
+    }
+    if (GetKeyState("LAlt") || GetKeyState("RAlt")) {
+        displayStr .= "Alt + "
+        DetectAlt := 1
+    }
+    if (GetKeyState("LWin") || GetKeyState("RWin")) {
+        displayStr .= "Win + "
+        DetectWin := 1
+    }
+    displayStr .= DetectedKey
+
+    GuiControl, KeyDetect:, DetectedKeyDisplay, %displayStr%
 return
 
-TestGestureHandler:
-    testHotkey := "{" A_ThisHotkey "}"
+ConfirmKey:
+    global DetectedKey, HotkeyList, ConfigFile
 
-    MouseGetPos, tx0, ty0
-    KeyWait, %A_ThisHotkey%
-    MouseGetPos, tx1, ty1
+    Gui, KeyDetect:Submit, NoHide
 
-    tdx := tx1 - tx0
-    tdy := ty1 - ty0
+    if (DetectedKey = "") {
+        MsgBox, 48, Error, Please detect a key first!
+        return
+    }
 
-    ; Determine direction
-    threshold := 30
-    if (Abs(tdx) > Abs(tdy)) {
-        if (tdx > threshold)
-            tdir := "right"
-        else if (tdx < -threshold)
-            tdir := "left"
-        else
-            tdir := "default"
+    finalHotkey := ""
+    if (DetectCtrl)
+        finalHotkey .= "^"
+    if (DetectShift)
+        finalHotkey .= "+"
+    if (DetectAlt)
+        finalHotkey .= "!"
+    if (DetectWin)
+        finalHotkey .= "#"
+    finalHotkey .= "{" . DetectedKey . "}"
+
+    normalizedHotkey := finalHotkey
+
+    found := false
+    for index, hk in HotkeyList {
+        if (hk = normalizedHotkey) {
+            found := true
+            break
+        }
+    }
+
+    if (!found) {
+        HotkeyList.Push(normalizedHotkey)
+        RefreshHotkeyList()
+
+        FileAppend, `n, %ConfigFile%
+        section := "Hotkey_" . normalizedHotkey
+        IniWrite, R, %ConfigFile%, %section%, mode
+        IniWrite, %A_Space%, %ConfigFile%, %section%, up
+        IniWrite, %A_Space%, %ConfigFile%, %section%, down
+        IniWrite, %A_Space%, %ConfigFile%, %section%, left
+        IniWrite, %A_Space%, %ConfigFile%, %section%, right
+        IniWrite, %normalizedHotkey%, %ConfigFile%, %section%, default
     } else {
-        if (tdy > threshold)
-            tdir := "down"
-        else if (tdy < -threshold)
-            tdir := "up"
-        else
-            tdir := "default"
+        MsgBox, 48, Info, Button already exists!
+        return
     }
 
-    result := testHotkey " - " tdir " (dx:" tdx " dy:" tdy ")"
-    GuiControl, Config:, TestStatus, %result%
-
-    Gosub, DisableGestureTest
+    gosub, CancelKey
 return
 
-DisableGestureTest:
+CancelKey:
+    gosub, StopKeyListener
+    Gui, KeyDetect:Destroy
+return
+
+StopKeyListener:
     Hotkey, RButton, Off
+    Hotkey, MButton, Off
     Hotkey, XButton1, Off
     Hotkey, XButton2, Off
+
+    Loop, 26 {
+        key := Chr(64 + A_Index)
+        Hotkey, %key%, Off
+    }
+
+    Loop, 10 {
+        key := A_Index - 1
+        Hotkey, %key%, Off
+    }
+
+    Loop, 12 {
+        key := "F" . A_Index
+        Hotkey, %key%, Off
+    }
+
+    specialKeys := ["Space", "Enter", "Escape", "Tab", "BackSpace", "Delete", "Insert", "Home", "End", "PgUp", "PgDn", "Up", "Down", "Left", "Right", "PrintScreen", "Pause", "CapsLock", "NumLock", "ScrollLock"]
+    for index, key in specialKeys {
+        Hotkey, %key%, Off
+    }
 return
 
-ClearStatus:
-    GuiControl, Config:, TestStatus, Ready
+KeyDetectGuiClose:
+KeyDetectGuiEscape:
+    gosub, StopKeyListener
+    Gui, KeyDetect:Destroy
 return
 
 ConfigGuiClose:
 ConfigGuiEscape:
 ExitApp
 return
-
-;------------------------------------- Helper Functions -------------------------------------
 
 SaveCurrentChanges() {
     global CurrentHotkey, PendingChanges, ButtonMode, AimDelay
@@ -279,11 +366,10 @@ SaveCurrentChanges() {
     if (CurrentHotkey = "")
         return
 
-    ; Store current values in pending changes
     if (!PendingChanges.HasKey(CurrentHotkey))
         PendingChanges[CurrentHotkey] := {}
 
-    PendingChanges[CurrentHotkey].mode := ButtonMode
+    PendingChanges[CurrentHotkey].mode := ConvertModeToStored(ButtonMode)
     PendingChanges[CurrentHotkey].aim_delay := AimDelay
     PendingChanges[CurrentHotkey].up := ActionUp
     PendingChanges[CurrentHotkey].down := ActionDown
@@ -295,19 +381,16 @@ SaveCurrentChanges() {
 LoadConfig() {
     global ConfigFile, HotkeyList, MoveThreshold
 
-    ; Load settings
     IniRead, threshold, %ConfigFile%, Settings, MoveThreshold, 30
     GuiControl, Config:, MoveThreshold, %threshold%
 
-    ; Scan for hotkeys
     HotkeyList := []
 
-    ; Read all sections
     IniRead, sections, %ConfigFile%
     Loop, Parse, sections, `n
     {
         if (InStr(A_LoopField, "Hotkey_") = 1) {
-            hotkey := SubStr(A_LoopField, 8) ; Remove "Hotkey_" prefix
+            hotkey := SubStr(A_LoopField, 8)
             HotkeyList.Push(hotkey)
         }
     }
@@ -318,33 +401,9 @@ LoadConfig() {
 RefreshHotkeyList() {
     global HotkeyList, ConfigFile
 
-    ; Build list string with mode indicators
     listStr := ""
     for index, hk in HotkeyList {
-        section := "Hotkey_" . hk
-        IniRead, mode, %ConfigFile%, %section%, mode, gesture
-
-        ; Count assigned actions
-        actionCount := 0
-        IniRead, val, %ConfigFile%, %section%, up
-        if (val != "" && val != " ")
-            actionCount++
-        IniRead, val, %ConfigFile%, %section%, down
-        if (val != "" && val != " ")
-            actionCount++
-        IniRead, val, %ConfigFile%, %section%, left
-        if (val != "" && val != " ")
-            actionCount++
-        IniRead, val, %ConfigFile%, %section%, right
-        if (val != "" && val != " ")
-            actionCount++
-        IniRead, val, %ConfigFile%, %section%, default
-        if (val != "" && val != " ")
-            actionCount++
-
-        ; Format: {button} [mode] (actions)
-        modeShort := SubStr(mode, 1, 1) ; g/c/a
-        listStr .= hk " [" modeShort "] (" actionCount ")|"
+        listStr .= hk "|"
     }
 
     GuiControl, Config:, HotkeyListBox, |%listStr%
@@ -353,18 +412,14 @@ RefreshHotkeyList() {
 LoadHotkeyData(hotkey) {
     global ConfigFile, PendingChanges
 
-    ; Strip any formatting like " [g] (5)" - only keep text before first space
     spacePos := InStr(hotkey, " ")
     if (spacePos > 0)
         hotkey := SubStr(hotkey, 1, spacePos - 1)
 
-    ; Trim any whitespace and construct section name
     hotkey := Trim(hotkey)
     section := "Hotkey_" . hotkey
 
-    ; Check if there are pending changes for this hotkey
     if (PendingChanges.HasKey(hotkey)) {
-        ; Load from pending changes
         mode := PendingChanges[hotkey].mode
         aimDelay := PendingChanges[hotkey].aim_delay
         up := PendingChanges[hotkey].up
@@ -373,7 +428,6 @@ LoadHotkeyData(hotkey) {
         right := PendingChanges[hotkey].right
         def := PendingChanges[hotkey].default
     } else {
-        ; Load from INI file
         IniRead, mode, %ConfigFile%, %section%, mode, gesture
         IniRead, aimDelay, %ConfigFile%, %section%, aim_delay, 150
         IniRead, up, %ConfigFile%, %section%, up, %A_Space%
@@ -382,7 +436,6 @@ LoadHotkeyData(hotkey) {
         IniRead, right, %ConfigFile%, %section%, right, %A_Space%
         IniRead, def, %ConfigFile%, %section%, default, %A_Space%
 
-        ; Trim to remove the space if it's the default
         up := Trim(up)
         down := Trim(down)
         left := Trim(left)
@@ -390,11 +443,12 @@ LoadHotkeyData(hotkey) {
         def := Trim(def)
     }
 
-    GuiControl, Config:ChooseString, ButtonMode, %mode%
+    displayMode := ConvertModeToDisplay(mode)
+
+    GuiControl, Config:ChooseString, ButtonMode, %displayMode%
     GuiControl, Config:, AimDelay, %aimDelay%
 
-    ; Show/hide aim controls
-    if (mode = "aim") {
+    if (displayMode = "Pull and Hold") {
         GuiControl, Config:Show, AimDelayLabel
         GuiControl, Config:Show, AimDelay
         GuiControl, Config:Show, AimDelayUpDown
@@ -409,7 +463,26 @@ LoadHotkeyData(hotkey) {
     GuiControl, Config:, ActionLeft, %left%
     GuiControl, Config:, ActionRight, %right%
     GuiControl, Config:, ActionDefault, %def%
+}
 
-    GuiControl, Config:, TestStatus, Loaded: %hotkey%
-    SetTimer, ClearStatus, -2000
+ConvertModeToDisplay(storedMode) {
+    if (storedMode = "R")
+        return "Pull and Release"
+    else if (storedMode = "T")
+        return "On Tap"
+    else if (storedMode = "H")
+        return "Pull and Hold"
+    else
+        return "Pull and Release"
+}
+
+ConvertModeToStored(displayMode) {
+    if (displayMode = "Pull and Release")
+        return "R"
+    else if (displayMode = "On Tap")
+        return "T"
+    else if (displayMode = "Pull and Hold")
+        return "H"
+    else
+        return "R"
 }
