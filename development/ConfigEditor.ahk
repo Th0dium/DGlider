@@ -44,29 +44,26 @@ BuildGUI:
     ; Gesture Directions
     Gui, Config:Add, GroupBox, x230 y95 w360 h220, Direction Actions
 
-    ; Visual gesture diagram
-    Gui, Config:Add, Text, x250 y120 w100 h100 Border Center 0x200 vGestureDiagram
-
     ; Direction inputs
     yPos := 120
-    Gui, Config:Add, Text, x370 y%yPos%, ↑ Up:
-    Gui, Config:Add, Edit, x430 y%yPos% w150 vActionUp
+    Gui, Config:Add, Text, x250 y%yPos%, Up:
+    Gui, Config:Add, Edit, x320 y%yPos% w260 vActionUp
 
     yPos += 30
-    Gui, Config:Add, Text, x370 y%yPos%, ← Left:
-    Gui, Config:Add, Edit, x430 y%yPos% w150 vActionLeft
+    Gui, Config:Add, Text, x250 y%yPos%, Left:
+    Gui, Config:Add, Edit, x320 y%yPos% w260 vActionLeft
 
     yPos += 30
-    Gui, Config:Add, Text, x370 y%yPos%, → Right:
-    Gui, Config:Add, Edit, x430 y%yPos% w150 vActionRight
+    Gui, Config:Add, Text, x250 y%yPos%, Right:
+    Gui, Config:Add, Edit, x320 y%yPos% w260 vActionRight
 
     yPos += 30
-    Gui, Config:Add, Text, x370 y%yPos%, ↓ Down:
-    Gui, Config:Add, Edit, x430 y%yPos% w150 vActionDown
+    Gui, Config:Add, Text, x250 y%yPos%, Down:
+    Gui, Config:Add, Edit, x320 y%yPos% w260 vActionDown
 
     yPos += 30
-    Gui, Config:Add, Text, x370 y%yPos%, ● Default:
-    Gui, Config:Add, Edit, x430 y%yPos% w150 vActionDefault
+    Gui, Config:Add, Text, x250 y%yPos%, Default:
+    Gui, Config:Add, Edit, x320 y%yPos% w260 vActionDefault
 
     ; Preview/Test Section
     Gui, Config:Add, GroupBox, x220 y340 w380 h100, Testing
@@ -234,7 +231,7 @@ TestGestureHandler:
             tdir := "default"
     }
 
-    result := testHotkey " → " tdir " (dx:" tdx " dy:" tdy ")"
+    result := testHotkey " - " tdir " (dx:" tdx " dy:" tdy ")"
     GuiControl, Config:, TestStatus, %result%
 
     Gosub, DisableGestureTest
