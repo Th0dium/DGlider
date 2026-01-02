@@ -8,6 +8,7 @@ SetWorkingDir, %A_ScriptDir%
 global ConfigFile := A_ScriptDir "\gesture_config.ini"
 global CurrentHotkey := ""
 global HotkeyList := []
+global PendingChanges := {} ; Store unsaved changes
 
 ; Launch GUI
 Gosub, BuildGUI
@@ -89,6 +90,12 @@ return
 
 OnHotkeySelect:
     Gui, Config:Submit, NoHide
+
+    ; Save current changes before switching
+    if (CurrentHotkey != "") {
+        SaveCurrentChanges()
+    }
+
     GuiControlGet, selectedIndex, Config:, HotkeyListBox
     if (selectedIndex > 0) {
         ; Get the actual selected text from the ListBox
@@ -124,22 +131,30 @@ SaveConfig:
         return
     }
 
+    ; Save current form values to pending changes first
+    SaveCurrentChanges()
+
     ; Save settings
     IniWrite, %MoveThreshold%, %ConfigFile%, Settings, MoveThreshold
 
-    ; Save hotkey config
-    section := "Hotkey_" . CurrentHotkey
-    IniWrite, %ButtonMode%, %ConfigFile%, %section%, mode
+    ; Save all pending changes to INI file
+    for hotkey, data in PendingChanges {
+        section := "Hotkey_" . hotkey
+        IniWrite, % data.mode, %ConfigFile%, %section%, mode
 
-    if (ButtonMode = "aim") {
-        IniWrite, %AimDelay%, %ConfigFile%, %section%, aim_delay
+        if (data.mode = "aim") {
+            IniWrite, % data.aim_delay, %ConfigFile%, %section%, aim_delay
+        }
+
+        IniWrite, % data.up, %ConfigFile%, %section%, up
+        IniWrite, % data.down, %ConfigFile%, %section%, down
+        IniWrite, % data.left, %ConfigFile%, %section%, left
+        IniWrite, % data.right, %ConfigFile%, %section%, right
+        IniWrite, % data.default, %ConfigFile%, %section%, default
     }
 
-    IniWrite, %ActionUp%, %ConfigFile%, %section%, up
-    IniWrite, %ActionDown%, %ConfigFile%, %section%, down
-    IniWrite, %ActionLeft%, %ConfigFile%, %section%, left
-    IniWrite, %ActionRight%, %ConfigFile%, %section%, right
-    IniWrite, %ActionDefault%, %ConfigFile%, %section%, default
+    ; Clear pending changes after save
+    PendingChanges := {}
 
     GuiControl, Config:, TestStatus, ✓ Saved successfully!
 
@@ -150,6 +165,9 @@ SaveConfig:
 return
 
 ReloadConfig:
+    ; Clear pending changes
+    PendingChanges := {}
+
     LoadConfig()
     if (CurrentHotkey != "") {
         LoadHotkeyData(CurrentHotkey)
@@ -254,6 +272,26 @@ return
 
 ;------------------------------------- Helper Functions -------------------------------------
 
+SaveCurrentChanges() {
+    global CurrentHotkey, PendingChanges, ButtonMode, AimDelay
+    global ActionUp, ActionDown, ActionLeft, ActionRight, ActionDefault
+
+    if (CurrentHotkey = "")
+        return
+
+    ; Store current values in pending changes
+    if (!PendingChanges.HasKey(CurrentHotkey))
+        PendingChanges[CurrentHotkey] := {}
+
+    PendingChanges[CurrentHotkey].mode := ButtonMode
+    PendingChanges[CurrentHotkey].aim_delay := AimDelay
+    PendingChanges[CurrentHotkey].up := ActionUp
+    PendingChanges[CurrentHotkey].down := ActionDown
+    PendingChanges[CurrentHotkey].left := ActionLeft
+    PendingChanges[CurrentHotkey].right := ActionRight
+    PendingChanges[CurrentHotkey].default := ActionDefault
+}
+
 LoadConfig() {
     global ConfigFile, HotkeyList, MoveThreshold
 
@@ -313,7 +351,7 @@ RefreshHotkeyList() {
 }
 
 LoadHotkeyData(hotkey) {
-    global ConfigFile
+    global ConfigFile, PendingChanges
 
     ; Strip any formatting like " [g] (5)" - only keep text before first space
     spacePos := InStr(hotkey, " ")
@@ -324,10 +362,35 @@ LoadHotkeyData(hotkey) {
     hotkey := Trim(hotkey)
     section := "Hotkey_" . hotkey
 
-    ; Load mode
-    IniRead, mode, %ConfigFile%, %section%, mode, gesture
-    GuiControl, Config:ChooseString, ButtonMode, %mode% ; Load aim delay if aim mode
-    IniRead, aimDelay, %ConfigFile%, %section%, aim_delay, 150
+    ; Check if there are pending changes for this hotkey
+    if (PendingChanges.HasKey(hotkey)) {
+        ; Load from pending changes
+        mode := PendingChanges[hotkey].mode
+        aimDelay := PendingChanges[hotkey].aim_delay
+        up := PendingChanges[hotkey].up
+        down := PendingChanges[hotkey].down
+        left := PendingChanges[hotkey].left
+        right := PendingChanges[hotkey].right
+        def := PendingChanges[hotkey].default
+    } else {
+        ; Load from INI file
+        IniRead, mode, %ConfigFile%, %section%, mode, gesture
+        IniRead, aimDelay, %ConfigFile%, %section%, aim_delay, 150
+        IniRead, up, %ConfigFile%, %section%, up, %A_Space%
+        IniRead, down, %ConfigFile%, %section%, down, %A_Space%
+        IniRead, left, %ConfigFile%, %section%, left, %A_Space%
+        IniRead, right, %ConfigFile%, %section%, right, %A_Space%
+        IniRead, def, %ConfigFile%, %section%, default, %A_Space%
+
+        ; Trim to remove the space if it's the default
+        up := Trim(up)
+        down := Trim(down)
+        left := Trim(left)
+        right := Trim(right)
+        def := Trim(def)
+    }
+
+    GuiControl, Config:ChooseString, ButtonMode, %mode%
     GuiControl, Config:, AimDelay, %aimDelay%
 
     ; Show/hide aim controls
@@ -340,20 +403,6 @@ LoadHotkeyData(hotkey) {
         GuiControl, Config:Hide, AimDelay
         GuiControl, Config:Hide, AimDelayUpDown
     }
-
-    ; Load actions - provide explicit empty default for missing keys
-    IniRead, up, %ConfigFile%, %section%, up, %A_Space%
-    IniRead, down, %ConfigFile%, %section%, down, %A_Space%
-    IniRead, left, %ConfigFile%, %section%, left, %A_Space%
-    IniRead, right, %ConfigFile%, %section%, right, %A_Space%
-    IniRead, def, %ConfigFile%, %section%, default, %A_Space%
-
-    ; Trim to remove the space if it's the default
-    up := Trim(up)
-    down := Trim(down)
-    left := Trim(left)
-    right := Trim(right)
-    def := Trim(def)
 
     GuiControl, Config:, ActionUp, %up%
     GuiControl, Config:, ActionDown, %down%
