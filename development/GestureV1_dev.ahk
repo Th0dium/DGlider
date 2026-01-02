@@ -27,17 +27,31 @@ Log(msg) {
     if (!logFile) {
         logDir := A_Desktop "\Log"
         IfNotExist, %logDir%
-        FileCreateDir, %logDir%
+            FileCreateDir, %logDir%
         logFile := logDir "\gesture_log.txt"
     }
     FileAppend, %A_Now% - %msg%`n, %logFile%
 }
 
 getAction(hotkey, direction) {
-    ; Read from gesture_config.ini
+    ; Read from gesture_config_dev.ini
     section := "Hotkey_" hotkey
-    IniRead, value, %A_ScriptDir%\gesture_config.ini, %section%, %direction%,
-        return value
+    IniRead, value, %A_ScriptDir%\gesture_config_dev.ini, %section%, %direction%,
+    return value
+}
+
+getButtonMode(hotkey) {
+    ; Read button mode: gesture, click, or aim
+    section := "Hotkey_" hotkey
+    IniRead, mode, %A_ScriptDir%\gesture_config_dev.ini, %section%, mode, gesture
+    return mode
+}
+
+getAimDelay(hotkey) {
+    ; Read aim mode repeat delay in ms
+    section := "Hotkey_" hotkey
+    IniRead, delay, %A_ScriptDir%\gesture_config_dev.ini, %section%, aim_delay, 100
+    return delay
 }
 
 WaitHotkeyRelease(hotkey) {
@@ -71,6 +85,37 @@ ResolveDirection(dx, dy, threshold) {
 HandleMouseAction(hotkey) {
     global MoveThreshold
 
+    mode := getButtonMode(hotkey)
+    Log("Hotkey: " hotkey " | Mode: " mode)
+
+    if (mode = "click") {
+        HandleClickMode(hotkey)
+    } else if (mode = "aim") {
+        HandleAimMode(hotkey)
+    } else {
+        HandleGestureMode(hotkey)
+    }
+}
+
+HandleClickMode(hotkey) {
+    ; Click mode: just execute default action without gesture detection
+    action := getAction(hotkey, "default")
+    Log("Click mode - Action: " action)
+
+    if (SubStr(action, 1, 3) = "fn:") {
+        funcName := SubStr(action, 4)
+        if (IsFunc(funcName)) {
+            %funcName%()
+        }
+    } else if (action != "") {
+        Send, %action%
+    }
+}
+
+HandleGestureMode(hotkey) {
+    ; Original gesture mode: hold + drag + release
+    global MoveThreshold
+
     MouseGetPos, x0, y0
     WaitHotkeyRelease(hotkey)
     MouseGetPos, x1, y1
@@ -78,13 +123,51 @@ HandleMouseAction(hotkey) {
     dx := x1 - x0
     dy := y1 - y0
 
-    Log("Hotkey: " hotkey " | dx: " dx " | dy: " dy)
+    Log("Gesture mode | dx: " dx " | dy: " dy)
 
     direction := ResolveDirection(dx, dy, MoveThreshold)
     action := getAction(hotkey, direction)
 
     Log("Direction: " direction " | Action: " action)
 
+    ExecuteAction(action)
+}
+
+HandleAimMode(hotkey) {
+    ; Aim mode: repeat action while dragging and holding
+    global MoveThreshold
+
+    MouseGetPos, x0, y0
+    delay := getAimDelay(hotkey)
+    lastDirection := ""
+
+    ; Monitor mouse position while button is held
+    Loop {
+        if (GetKeyState(StrReplace(hotkey, "{", ""), "}"), "P") = 0)
+            break
+
+        MouseGetPos, x1, y1
+        dx := x1 - x0
+        dy := y1 - y0
+
+        direction := ResolveDirection(dx, dy, MoveThreshold)
+
+        ; Only trigger if direction changed or on first detection
+        if (direction != "default" && direction != lastDirection) {
+            action := getAction(hotkey, direction)
+            Log("Aim mode | Direction: " direction " | Action: " action)
+
+            ExecuteAction(action)
+            lastDirection := direction
+        }
+
+        Sleep, %delay%
+    }
+
+    Log("Aim mode released")
+}
+
+ExecuteAction(action) {
     if (SubStr(action, 1, 3) = "fn:") {
         funcName := SubStr(action, 4)
         if (IsFunc(funcName)) {
