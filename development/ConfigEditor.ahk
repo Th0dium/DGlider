@@ -577,38 +577,46 @@ return
 
 ; Disable all hotkey listeners
 StopKeyListener:
-    ; Check if hotkeys were registered before disabling
-    if (DetectedKey != "") {
-        Hotkey, RButton, Off
-        Hotkey, MButton, Off
-        Hotkey, XButton1, Off
-        Hotkey, XButton2, Off
+    ; Disable all listeners that may have been registered. Previously this only
+    ; ran if a key had been detected (DetectedKey != ""), which meant closing
+    ; the dialog without detecting a key left the listeners active. Run the
+    ; cleanup unconditionally and reset detection state.
+    Hotkey, RButton, Off
+    Hotkey, MButton, Off
+    Hotkey, XButton1, Off
+    Hotkey, XButton2, Off
 
-        Loop, 26 {
-            key := Chr(64 + A_Index)
-            Hotkey, %key%, Off
-        }
-
-        Loop, 10 {
-            key := A_Index - 1
-            Hotkey, %key%, Off
-        }
-
-        Loop, 12 {
-            key := "F" . A_Index
-            Hotkey, %key%, Off
-        }
-
-        specialKeys := ["Space", "Enter", "Escape", "Tab", "BackSpace", "Delete", "Insert", "Home", "End", "PgUp", "PgDn", "Up", "Down", "Left", "Right", "PrintScreen", "Pause", "CapsLock", "NumLock", "ScrollLock"]
-        for index, key in specialKeys {
-            Hotkey, %key%, Off
-        }
-
-        modifierKeys := ["Shift", "LShift", "RShift", "Alt", "LAlt", "RAlt", "Ctrl", "LControl", "RControl"]
-        for index, key in modifierKeys {
-            Hotkey, %key%, Off
-        }
+    Loop, 26 {
+        key := Chr(64 + A_Index)
+        Hotkey, %key%, Off
     }
+
+    Loop, 10 {
+        key := A_Index - 1
+        Hotkey, %key%, Off
+    }
+
+    Loop, 12 {
+        key := "F" . A_Index
+        Hotkey, %key%, Off
+    }
+
+    specialKeys := ["Space", "Enter", "Escape", "Tab", "BackSpace", "Delete", "Insert", "Home", "End", "PgUp", "PgDn", "Up", "Down", "Left", "Right", "PrintScreen", "Pause", "CapsLock", "NumLock", "ScrollLock"]
+    for index, key in specialKeys {
+        Hotkey, %key%, Off
+    }
+
+    modifierKeys := ["Shift", "LShift", "RShift", "Alt", "LAlt", "RAlt", "Ctrl", "LControl", "RControl"]
+    for index, key in modifierKeys {
+        Hotkey, %key%, Off
+    }
+
+    ; Clear detection state so subsequent opens start fresh
+    DetectedKey := ""
+    DetectCtrl := 0
+    DetectShift := 0
+    DetectAlt := 0
+    DetectWin := 0
 return
 
 ; ============================================================================
