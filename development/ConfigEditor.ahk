@@ -17,6 +17,7 @@ global ConfigFile := A_ScriptDir "\gesture_config.ini"
 global CurrentHotkey := "" ; Currently selected button in the list
 global HotkeyList := [] ; Array of all configured buttons
 global PendingChanges := {} ; Unsaved changes (stored as mode codes: R/T/H)
+global HotkeyListBoxHwnd := "" ; Handle for ListBox control
 
 Gosub, BuildGUI
 return
@@ -31,7 +32,7 @@ BuildGUI:
 
     ; --- Left Panel: Button List ---
     Gui, Config:Add, Text, x10 y10 w200, Buttons:
-    Gui, Config:Add, ListBox, x10 y30 w200 h350 vHotkeyListBox gOnHotkeySelect, 
+    Gui, Config:Add, ListBox, x10 y30 w200 h350 vHotkeyListBox gOnHotkeySelect +HwndHotkeyListBoxHwnd, 
 
     ; --- Left Panel: Global Settings ---
     Gui, Config:Add, GroupBox, x10 y390 w200 h80, Settings
@@ -47,12 +48,7 @@ BuildGUI:
     Gui, Config:Add, Text, x230 y35, Button Mode:
     Gui, Config:Add, DropDownList, x330 y32 w150 vButtonMode gOnModeChange, Pull and Release|On Tap|Pull and Hold
 
-    ; Aim Delay (only visible for "Pull and Hold" mode)
-    Gui, Config:Add, Text, x230 y65 vAimDelayLabel Hidden, Aim Delay (ms):
-    Gui, Config:Add, Edit, x330 y62 w80 vAimDelay Number Hidden
-    Gui, Config:Add, UpDown, vAimDelayUpDown Range50-1000 Hidden, 150
-
-    ; --- Direction Actions ---
+    ; (Normalization moved to ConfirmKey - keep GUI construction focused on controls)
     Gui, Config:Add, GroupBox, x230 y105 w360 h210, Direction Actions
 
     yPos := 130
@@ -102,11 +98,17 @@ OnHotkeySelect:
         SaveCurrentChanges()
     }
 
-    ; Load data for the newly selected button
-    GuiControlGet, selectedIndex, Config:, HotkeyListBox
-    if (selectedIndex > 0) {
-        GuiControlGet, selectedText, Config:, HotkeyListBox
-        CurrentHotkey := selectedText
+    ; Get selected index using SendMessage (more reliable than GuiControlGet for ListBox)
+    ; LB_GETCURSEL = 0x188, returns 0-based index or -1 if none selected
+    SendMessage, 0x188, 0, 0,, ahk_id %HotkeyListBoxHwnd%
+    selectedIndex := ErrorLevel
+
+    if (selectedIndex != 0xFFFFFFFF && selectedIndex < HotkeyList.Count()) {
+        ; Use HotkeyList array directly instead of parsing ListBox text
+        ; This avoids issues with special characters like +, !, #, ^
+        CurrentHotkey := HotkeyList[selectedIndex + 1] ; Array is 1-based
+
+        ; Load the hotkey data
         LoadHotkeyData(CurrentHotkey)
     }
 return
@@ -446,6 +448,14 @@ StartKeyListener:
     for index, key in specialKeys {
         Hotkey, %key%, OnKeyDetected, On
     }
+
+    ; Modifier keys - allow detecting modifier alone (Shift/Alt/Ctrl)
+    ; Note: the Windows key (Win/LWin/RWin) cannot be used as a standalone hotkey
+    ; (AutoHotkey will raise ""win" is not a valid key name"), so omit it here.
+    modifierKeys := ["Shift", "LShift", "RShift", "Alt", "LAlt", "RAlt", "Ctrl", "LControl", "RControl"]
+    for index, key in modifierKeys {
+        Hotkey, %key%, OnKeyDetected, On
+    }
 return
 
 ; Called when a key is detected - updates the display with key and modifiers
@@ -453,27 +463,25 @@ OnKeyDetected:
     global DetectedKey, DetectCtrl, DetectShift, DetectAlt, DetectWin, DetectedKeyDisplay
 
     DetectedKey := A_ThisHotkey
+    ; Normalize some modifier key names (e.g. LShift -> Shift) for display & storage
+    if (RegExMatch(DetectedKey, "i)shift")) {
+        DetectedKey := "Shift"
+    } else if (RegExMatch(DetectedKey, "i)control|ctrl")) {
+        DetectedKey := "Ctrl"
+    } else if (RegExMatch(DetectedKey, "i)alt")) {
+        DetectedKey := "Alt"
+    } else if (RegExMatch(DetectedKey, "i)win")) {
+        DetectedKey := "Win"
+    }
 
-    ; Check which modifiers are held and update checkboxes
-    displayStr := ""
-    if (GetKeyState("LCtrl") || GetKeyState("RCtrl")) {
-        displayStr .= "Ctrl + "
-        DetectCtrl := 1
-    }
-    if (GetKeyState("LShift") || GetKeyState("RShift")) {
-        displayStr .= "Shift + "
-        DetectShift := 1
-    }
-    if (GetKeyState("LAlt") || GetKeyState("RAlt")) {
-        displayStr .= "Alt + "
-        DetectAlt := 1
-    }
-    if (GetKeyState("LWin") || GetKeyState("RWin")) {
-        displayStr .= "Win + "
-        DetectWin := 1
-    }
-    displayStr .= DetectedKey
+    ; Ensure all modifiers are detected and displayed correctly (physical state)
+    modifiers := ""
+    DetectCtrl := GetKeyState("Ctrl", "P") ? (modifiers .= "Ctrl + ", 1) : 0
+    DetectShift := GetKeyState("Shift", "P") ? (modifiers .= "Shift + ", 1) : 0
+    DetectAlt := GetKeyState("Alt", "P") ? (modifiers .= "Alt + ", 1) : 0
+    DetectWin := (GetKeyState("LWin", "P") || GetKeyState("RWin", "P")) ? (modifiers .= "Win + ", 1) : 0
 
+    displayStr := modifiers . DetectedKey
     GuiControl, KeyDetect:, DetectedKeyDisplay, %displayStr%
 return
 
@@ -488,7 +496,7 @@ ConfirmKey:
         return
     }
 
-    ; Build the hotkey string with modifiers (^=Ctrl, +=Shift, !=Alt, #=Win)
+    ; Normalize hotkey string with modifiers
     finalHotkey := ""
     if (DetectCtrl)
         finalHotkey .= "^"
@@ -496,9 +504,36 @@ ConfirmKey:
         finalHotkey .= "+"
     if (DetectAlt)
         finalHotkey .= "!"
+
     if (DetectWin)
         finalHotkey .= "#"
-    finalHotkey .= "{" . DetectedKey . "}"
+
+    ; If the detected key is itself a modifier (or no non-mod key was found),
+    ; represent the combination as a single brace-wrapped modifier list
+    if (DetectedKey = "Shift" || DetectedKey = "Ctrl" || DetectedKey = "Alt" || DetectedKey = "Win") {
+        mods := ""
+        if (DetectCtrl)
+            mods .= (mods = "" ? "Ctrl" : "+Ctrl")
+        if (DetectShift)
+            mods .= (mods = "" ? "Shift" : "+Shift")
+        if (DetectAlt)
+            mods .= (mods = "" ? "Alt" : "+Alt")
+        if (DetectWin)
+            mods .= (mods = "" ? "Win" : "+Win")
+
+        ; Fallback to the detected key if no modifiers were captured for some reason
+        if (mods = "")
+            mods := DetectedKey
+
+        finalHotkey := "{" . mods . "}"
+    } else {
+        ; For letters/digits/functions, don't wrap in braces; for special keys keep braces
+        if (RegExMatch(DetectedKey, "^[A-Za-z0-9]$") || RegExMatch(DetectedKey, "^F\d+$")) {
+            finalHotkey .= SubStr(DetectedKey, 1) ; letter/number/function (case preserved)
+        } else {
+            finalHotkey .= "{" . DetectedKey . "}"
+        }
+    }
 
     normalizedHotkey := finalHotkey
 
@@ -540,29 +575,37 @@ return
 
 ; Disable all hotkey listeners
 StopKeyListener:
-    Hotkey, RButton, Off
-    Hotkey, MButton, Off
-    Hotkey, XButton1, Off
-    Hotkey, XButton2, Off
+    ; Check if hotkeys were registered before disabling
+    if (DetectedKey != "") {
+        Hotkey, RButton, Off
+        Hotkey, MButton, Off
+        Hotkey, XButton1, Off
+        Hotkey, XButton2, Off
 
-    Loop, 26 {
-        key := Chr(64 + A_Index)
-        Hotkey, %key%, Off
-    }
+        Loop, 26 {
+            key := Chr(64 + A_Index)
+            Hotkey, %key%, Off
+        }
 
-    Loop, 10 {
-        key := A_Index - 1
-        Hotkey, %key%, Off
-    }
+        Loop, 10 {
+            key := A_Index - 1
+            Hotkey, %key%, Off
+        }
 
-    Loop, 12 {
-        key := "F" . A_Index
-        Hotkey, %key%, Off
-    }
+        Loop, 12 {
+            key := "F" . A_Index
+            Hotkey, %key%, Off
+        }
 
-    specialKeys := ["Space", "Enter", "Escape", "Tab", "BackSpace", "Delete", "Insert", "Home", "End", "PgUp", "PgDn", "Up", "Down", "Left", "Right", "PrintScreen", "Pause", "CapsLock", "NumLock", "ScrollLock"]
-    for index, key in specialKeys {
-        Hotkey, %key%, Off
+        specialKeys := ["Space", "Enter", "Escape", "Tab", "BackSpace", "Delete", "Insert", "Home", "End", "PgUp", "PgDn", "Up", "Down", "Left", "Right", "PrintScreen", "Pause", "CapsLock", "NumLock", "ScrollLock"]
+        for index, key in specialKeys {
+            Hotkey, %key%, Off
+        }
+
+        modifierKeys := ["Shift", "LShift", "RShift", "Alt", "LAlt", "RAlt", "Ctrl", "LControl", "RControl"]
+        for index, key in modifierKeys {
+            Hotkey, %key%, Off
+        }
     }
 return
 
@@ -620,7 +663,53 @@ LoadConfig() {
     {
         if (InStr(A_LoopField, "Hotkey_") = 1) {
             hotkey := SubStr(A_LoopField, 8)
+            hotkey := Trim(hotkey)
+
+            ; Migrate legacy modifier-symbol-only section names (e.g. ^+, +!, ^)
+            if (RegExMatch(hotkey, "^[\^+!#]+$")) {
+                mods := ""
+                if (InStr(hotkey, "^"))
+                    mods .= (mods = "" ? "Ctrl" : "+Ctrl")
+                if (InStr(hotkey, "+"))
+                    mods .= (mods = "" ? "Shift" : "+Shift")
+                if (InStr(hotkey, "!"))
+                    mods .= (mods = "" ? "Alt" : "+Alt")
+                if (InStr(hotkey, "#"))
+                    mods .= (mods = "" ? "Win" : "+Win")
+
+                newHotkey := "{" . mods . "}"
+
+                ; Read old values
+                oldSection := "Hotkey_" . hotkey
+                IniRead, modeVal, %ConfigFile%, %oldSection%, mode
+                IniRead, aimVal, %ConfigFile%, %oldSection%, aim_delay
+                IniRead, upVal, %ConfigFile%, %oldSection%, up
+                IniRead, downVal, %ConfigFile%, %oldSection%, down
+                IniRead, leftVal, %ConfigFile%, %oldSection%, left
+                IniRead, rightVal, %ConfigFile%, %oldSection%, right
+                IniRead, defVal, %ConfigFile%, %oldSection%, default
+
+                ; Write to new section (overwrites if exists)
+                newSection := "Hotkey_" . newHotkey
+                if (modeVal != "")
+                    IniWrite, %modeVal%, %ConfigFile%, %newSection%, mode
+                if (aimVal != "")
+                    IniWrite, %aimVal%, %ConfigFile%, %newSection%, aim_delay
+                IniWrite, % upVal := upVal ? upVal : %A_Space% , %ConfigFile%, %newSection%, up
+                IniWrite, % downVal := downVal ? downVal : %A_Space% , %ConfigFile%, %newSection%, down
+                IniWrite, % leftVal := leftVal ? leftVal : %A_Space% , %ConfigFile%, %newSection%, left
+                IniWrite, % rightVal := rightVal ? rightVal : %A_Space% , %ConfigFile%, %newSection%, right
+                IniWrite, % defVal := defVal ? defVal : %A_Space% , %ConfigFile%, %newSection%, default
+
+                ; Delete old section
+                IniDelete, %ConfigFile%, %oldSection%
+
+                hotkey := newHotkey
+            }
             HotkeyList.Push(hotkey)
+
+            ; Preload data for each button
+            LoadHotkeyData(hotkey)
         }
     }
 
@@ -639,10 +728,14 @@ RefreshHotkeyList() {
     GuiControl, Config:, HotkeyListBox, |%listStr%
 }
 
-; Load a specific button's data into the form fields
-; Checks PendingChanges first, then falls back to INI file
+; Update LoadHotkeyData to populate the GUI for all buttons
 LoadHotkeyData(hotkey) {
     global ConfigFile, PendingChanges
+
+    ; Clean up hotkey string
+    spacePos := InStr(hotkey, " ")
+    if (spacePos > 0)
+        hotkey := SubStr(hotkey, 1, spacePos - 1)
 
     hotkey := Trim(hotkey)
     section := "Hotkey_" . hotkey
@@ -675,7 +768,7 @@ LoadHotkeyData(hotkey) {
     ; Convert stored mode code to display name
     displayMode := ConvertModeToDisplay(mode)
 
-    ; Update form controls
+    ; Update form controls for preloading
     GuiControl, Config:ChooseString, ButtonMode, %displayMode%
     GuiControl, Config:, AimDelay, %aimDelay%
 
@@ -723,6 +816,4 @@ ConvertModeToStored(displayMode) {
         return "T"
     else if (displayMode = "Pull and Hold")
         return "H"
-    else
-        return "R"
 }
