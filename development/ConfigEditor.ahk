@@ -197,31 +197,33 @@ DeleteHotkey:
     }
 
     MsgBox, 4, Confirm Delete, Delete button "%CurrentHotkey%"?
-    if (ErrorLevel = 2)
-        return
+    ; Use IfMsgBox to correctly detect the 'No' response (otherwise numeric ErrorLevel
+    ; comparisons can be unreliable depending on AHK version/options).
+    IfMsgBox, No
+return
 
-    ; Remove from HotkeyList array
-    for index, hk in HotkeyList {
-        if (hk = CurrentHotkey) {
-            HotkeyList.RemoveAt(index)
-            break
-        }
+; Remove from HotkeyList array
+for index, hk in HotkeyList {
+    if (hk = CurrentHotkey) {
+        HotkeyList.RemoveAt(index)
+        break
     }
+}
 
-    ; Delete from INI file
-    section := "Hotkey_" . CurrentHotkey
-    IniDelete, %ConfigFile%, %section%
+; Delete from INI file
+section := "Hotkey_" . CurrentHotkey
+IniDelete, %ConfigFile%, %section%
 
-    ; Clear the form
-    CurrentHotkey := ""
-    GuiControl, Config:, HotkeyListBox, 
-    GuiControl, Config:, ActionUp, 
-    GuiControl, Config:, ActionDown, 
-    GuiControl, Config:, ActionLeft, 
-    GuiControl, Config:, ActionRight, 
-    GuiControl, Config:, ActionDefault, 
+; Clear the form
+CurrentHotkey := ""
+GuiControl, Config:, HotkeyListBox, 
+GuiControl, Config:, ActionUp, 
+GuiControl, Config:, ActionDown, 
+GuiControl, Config:, ActionLeft, 
+GuiControl, Config:, ActionRight, 
+GuiControl, Config:, ActionDefault, 
 
-    RefreshHotkeyList()
+RefreshHotkeyList()
 return
 
 ; ============================================================================
