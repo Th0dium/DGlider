@@ -285,6 +285,92 @@ VolumeOSD_Wheel(dir) {
     GuiControl, OSDVol:, OSDBar, %newVal%
 }
 
+; Screen rotation by timed mouse movement sample (no GUI).
+ScreenRotateOSD() {
+    global MoveThreshold
+
+    ; Sample A immediately, wait 500ms, then sample B.
+    MouseGetPos, xA, yA
+    Sleep, 500
+    MouseGetPos, xB, yB
+
+    dx := xB - xA
+    dy := yB - yA
+    direction := ResolveDirection(dx, dy, MoveThreshold)
+
+    Log("ScreenRotate gesture dx: " dx " dy: " dy " dir: " direction)
+
+    ; Map gesture direction to rotation angle.
+    if (direction = "up") {
+        RotateDisplay(180)
+    } else if (direction = "right") {
+        RotateDisplay(90)
+    } else if (direction = "down") {
+        RotateDisplay(0)
+    } else if (direction = "left") {
+        RotateDisplay(270)
+    } else {
+        Log("ScreenRotateOSD: no significant movement")
+    }
+}
+
+RotateDisplay(angle) {
+    ; angle: 0, 90, 180, 270
+    static DM_DISPLAYORIENTATION := 0x80
+    static DM_PELSWIDTH := 0x80000
+    static DM_PELSHEIGHT := 0x100000
+
+    if (angle != 0 && angle != 90 && angle != 180 && angle != 270) {
+        Log("RotateDisplay invalid angle: " angle)
+        return
+    }
+
+    dmSize := (A_PtrSize = 8) ? 220 : 156
+    VarSetCapacity(dm, dmSize, 0)
+    NumPut(dmSize, dm, 68, "UShort") ; dmSize
+
+    if (!DllCall("EnumDisplaySettings", "ptr", 0, "uint", -1, "ptr", &dm)) {
+        Log("RotateDisplay: EnumDisplaySettings failed")
+        return
+    }
+
+    orientMap := {0: 0, 90: 1, 180: 2, 270: 3}
+    newOrient := orientMap[angle]
+    curOrient := NumGet(dm, 84, "UInt")
+    if (curOrient = newOrient) {
+        Log("RotateDisplay: already at " angle)
+        return
+    }
+
+    curW := NumGet(dm, 108, "UInt")
+    curH := NumGet(dm, 112, "UInt")
+    curPortrait := (curOrient = 1 || curOrient = 3)
+    newPortrait := (newOrient = 1 || newOrient = 3)
+
+    dmFields := NumGet(dm, 72, "UInt")
+    dmFields |= DM_DISPLAYORIENTATION
+
+    if (curPortrait != newPortrait) {
+        ; Swap width/height when rotating between landscape/portrait
+        NumPut(curH, dm, 108, "UInt")
+        NumPut(curW, dm, 112, "UInt")
+        dmFields |= DM_PELSWIDTH | DM_PELSHEIGHT
+    }
+
+    NumPut(dmFields, dm, 72, "UInt")
+    NumPut(newOrient, dm, 84, "UInt")
+
+    result := DllCall("ChangeDisplaySettings", "ptr", &dm, "uint", 0)
+    Log("RotateDisplay result: " result " -> angle " angle)
+    if (result = 1) {
+        MsgBox, 48, DGlider, Display rotation applied. A restart may be required.
+    } else if (result = 2) {
+        MsgBox, 48, DGlider, Rotation not supported for this display/driver (portrait mode may be unavailable).
+    } else if (result != 0) {
+        MsgBox, 16, DGlider, Display rotation failed. Result code: %result%
+    }
+}
+
 ;------------------------------- Profile Management ------------------------------
 
 GetProfiles() {

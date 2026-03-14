@@ -35,23 +35,28 @@ BuildGUI:
     Gui, Config:Add, ListBox, x10 y30 w200 h350 vHotkeyListBox gOnHotkeySelect +HwndHotkeyListBoxHwnd, 
 
     ; --- Left Panel: Global Settings ---
-    Gui, Config:Add, GroupBox, x10 y390 w200 h80, Settings
+    Gui, Config:Add, GroupBox, x10 y390 w200 h120, Settings
     Gui, Config:Add, Text, x20 y410, Move Threshold:
     Gui, Config:Add, Edit, x20 y430 w80 vMoveThreshold Number
     Gui, Config:Add, UpDown, Range10-100, 30
-    Gui, Config:Add, Button, x115 y428 w85 h25 gRearrangeButtons, Rearrange
+    Gui, Config:Add, Button, x20 y460 w80 h25 gOpenConfigFile, Open Config
+    Gui, Config:Add, Button, x115 y460 w85 h25 gRearrangeButtons, Rearrange
 
     ; --- Right Panel: Button Properties ---
     Gui, Config:Add, GroupBox, x220 y10 w380 h340, Button Properties
 
+    ; Selected Button Display
+    Gui, Config:Add, Text, x230 y30, Button:
+    Gui, Config:Add, Edit, x330 y27 w150 h22 vSelectedButtonDisplay cGray gRenameButton
+
     ; Mode Selection (R=Pull and Release, T=On Tap, H=Pull and Hold)
-    Gui, Config:Add, Text, x230 y35, Button Mode:
-    Gui, Config:Add, DropDownList, x330 y32 w150 vButtonMode gOnModeChange, Pull and Release|On Tap|Pull and Hold
+    Gui, Config:Add, Text, x230 y55, Button Mode:
+    Gui, Config:Add, DropDownList, x330 y52 w150 vButtonMode gOnModeChange, Pull and Release|On Tap|Pull and Hold
 
     ; (Normalization moved to ConfirmKey - keep GUI construction focused on controls)
-    Gui, Config:Add, GroupBox, x230 y105 w360 h210, Direction Actions
+    Gui, Config:Add, GroupBox, x230 y125 w360 h210, Direction Actions
 
-    yPos := 130
+    yPos := 150
     Gui, Config:Add, Text, x250 y%yPos%, Up:
     Gui, Config:Add, Edit, x320 y%yPos% w260 vActionUp
 
@@ -80,14 +85,37 @@ BuildGUI:
     ; --- Help Text ---
     Gui, Config:Add, Text, x220 y425 w380 cGray, Tip: Use {key} syntax for keys, ^=Ctrl !=Alt +=Shift #=Win
 
+    ; --- Status Text ---
+    Gui, Config:Add, Text, x220 y445 w380 vStatusText cBlue, Ready
+
     LoadConfig()
 
-    Gui, Config:Show, w610 h490
+    ; Initially hide button properties section since no button is selected
+    ShowButtonProperties(false)
+
+    Gui, Config:Show, w610 h530
 return
 
 ; ============================================================================
 ; EVENT HANDLERS
 ; ============================================================================
+
+; Update status text in the main GUI
+UpdateStatus(message) {
+    GuiControl, Config:, StatusText, %message%
+    ; Auto-clear status after 3 seconds
+    SetTimer, ClearStatus, -3000
+}
+
+ClearStatus:
+    GuiControl, Config:, StatusText, Ready
+return
+
+; Open the raw config file in the default editor
+OpenConfigFile:
+    global ConfigFile
+    Run, %ConfigFile%
+return
 
 ; Called when user selects a button from the list
 OnHotkeySelect:
@@ -108,8 +136,14 @@ OnHotkeySelect:
         ; This avoids issues with special characters like +, !, #, ^
         CurrentHotkey := HotkeyList[selectedIndex + 1] ; Array is 1-based
 
-        ; Load the hotkey data
+        ; Load the hotkey data and show properties
         LoadHotkeyData(CurrentHotkey)
+        ShowButtonProperties(true)
+    } else {
+        ; No button selected, hide properties section
+        CurrentHotkey := ""
+        ClearButtonProperties()
+        ShowButtonProperties(false)
     }
 return
 
@@ -136,40 +170,87 @@ return
 SaveConfig:
     Gui, Config:Submit, NoHide
 
-    if (CurrentHotkey = "") {
-        MsgBox, 48, Warning, Please select a button first!
-        return
+    ; Read current MoveThreshold from INI to compare
+    IniRead, currentThreshold, %ConfigFile%, Settings, MoveThreshold, 30
+    thresholdChanged := (MoveThreshold != currentThreshold)
+
+    ; Save current button's changes to PendingChanges first
+    if (CurrentHotkey != "") {
+        SaveCurrentChanges()
     }
 
-    SaveCurrentChanges()
+    ; Track if anything was actually saved
+    somethingChanged := false
 
-    ; Save global settings
-    IniWrite, %MoveThreshold%, %ConfigFile%, Settings, MoveThreshold
+    ; Save global settings if changed
+    if (thresholdChanged) {
+        IniWrite, %MoveThreshold%, %ConfigFile%, Settings, MoveThreshold
+        somethingChanged := true
+    }
 
-    ; Save each button's configuration
-    for hotkey, data in PendingChanges {
-        section := "Hotkey_" . hotkey
-        storedMode := ConvertModeToStored(data.mode)
-        IniWrite, %storedMode%, %ConfigFile%, %section%, mode
+    ; Check if there are any button changes to save
+    if (PendingChanges.Count() > 0) {
+        somethingChanged := true
 
-        ; Only save aim_delay for "Pull and Hold" mode
-        if (storedMode = "H") {
-            IniWrite, % data.aim_delay, %ConfigFile%, %section%, aim_delay
+        ; Save each button's configuration
+        for hotkey, data in PendingChanges {
+            ; Check if this is a rename operation
+            if (data.HasKey("renamed_to")) {
+                newName := data.renamed_to
+                oldSection := "Hotkey_" . hotkey
+
+                ; Read all data from old section
+                IniRead, mode, %ConfigFile%, %oldSection%, mode, R
+                IniRead, aimDelay, %ConfigFile%, %oldSection%, aim_delay, 150
+                IniRead, up, %ConfigFile%, %oldSection%, up, %A_Space%
+                IniRead, down, %ConfigFile%, %oldSection%, down, %A_Space%
+                IniRead, left, %ConfigFile%, %oldSection%, left, %A_Space%
+                IniRead, right, %ConfigFile%, %oldSection%, right, %A_Space%
+                IniRead, def, %ConfigFile%, %oldSection%, default, %A_Space%
+
+                ; Delete old section
+                IniDelete, %ConfigFile%, %oldSection%
+
+                ; Write to new section
+                newSection := "Hotkey_" . newName
+                IniWrite, %mode%, %ConfigFile%, %newSection%, mode
+                IniWrite, %aimDelay%, %ConfigFile%, %newSection%, aim_delay
+                IniWrite, %up%, %ConfigFile%, %newSection%, up
+                IniWrite, %down%, %ConfigFile%, %newSection%, down
+                IniWrite, %left%, %ConfigFile%, %newSection%, left
+                IniWrite, %right%, %ConfigFile%, %newSection%, right
+                IniWrite, %def%, %ConfigFile%, %newSection%, default
+            } else {
+                ; Regular button configuration save
+                section := "Hotkey_" . hotkey
+                storedMode := ConvertModeToStored(data.mode)
+                IniWrite, %storedMode%, %ConfigFile%, %section%, mode
+
+                ; Only save aim_delay for "Pull and Hold" mode
+                if (storedMode = "H") {
+                    IniWrite, % data.aim_delay, %ConfigFile%, %section%, aim_delay
+                }
+
+                IniWrite, % data.up, %ConfigFile%, %section%, up
+                IniWrite, % data.down, %ConfigFile%, %section%, down
+                IniWrite, % data.left, %ConfigFile%, %section%, left
+                IniWrite, % data.right, %ConfigFile%, %section%, right
+                IniWrite, % data.default, %ConfigFile%, %section%, default
+            }
         }
 
-        IniWrite, % data.up, %ConfigFile%, %section%, up
-        IniWrite, % data.down, %ConfigFile%, %section%, down
-        IniWrite, % data.left, %ConfigFile%, %section%, left
-        IniWrite, % data.right, %ConfigFile%, %section%, right
-        IniWrite, % data.default, %ConfigFile%, %section%, default
+        PendingChanges := {}
+
+        RefreshHotkeyList()
     }
 
-    PendingChanges := {}
-
-    RefreshHotkeyList()
+    if (somethingChanged) {
+        UpdateStatus("Configuration saved successfully.")
+    } else {
+        UpdateStatus("No changes to save.")
+    }
 return
 
-; Discard all pending changes and reload from INI file
 ReloadConfig:
     PendingChanges := {}
 
@@ -177,6 +258,7 @@ ReloadConfig:
     if (CurrentHotkey != "") {
         LoadHotkeyData(CurrentHotkey)
     }
+    UpdateStatus("Configuration loaded successfully.")
 return
 
 ; ============================================================================
@@ -216,14 +298,11 @@ IniDelete, %ConfigFile%, %section%
 
 ; Clear the form
 CurrentHotkey := ""
-GuiControl, Config:, HotkeyListBox, 
-GuiControl, Config:, ActionUp, 
-GuiControl, Config:, ActionDown, 
-GuiControl, Config:, ActionLeft, 
-GuiControl, Config:, ActionRight, 
-GuiControl, Config:, ActionDefault, 
+ClearButtonProperties()
+ShowButtonProperties(false)
 
 RefreshHotkeyList()
+UpdateStatus("Button deleted successfully.")
 return
 
 ; ============================================================================
@@ -239,58 +318,58 @@ RearrangeButtons:
         return
     }
 
-    Gui, Rearrange:New, +AlwaysOnTop, Rearrange Buttons
+    Gui, Rearrange:New, , Rearrange Buttons
     Gui, Rearrange:Color, F0F0F0
 
-    Gui, Rearrange:Add, Text, x10 y10 w280, Drag items to rearrange order:
-    Gui, Rearrange:Add, ListBox, x10 y35 w280 h200 vRearrangeListBox, 
+    ; Left column: ListView for buttons
+    Gui, Rearrange:Add, Text, x10 y10 w180, Button Hotkeys:
+    Gui, Rearrange:Add, ListView, x10 y35 w180 h200 vRearrangeListView -Multi, Button Hotkey
 
-    Gui, Rearrange:Add, Button, x10 y245 w60 h30 gRearrangeMoveUp, Move Up
-    Gui, Rearrange:Add, Button, x75 y245 w70 h30 gRearrangeMoveDown, Move Down
-    Gui, Rearrange:Add, Button, x150 y245 w60 h30 gRearrangeApply Default, Apply
-    Gui, Rearrange:Add, Button, x215 y245 w75 h30 gRearrangeCancel, Cancel
-
-    ; Populate list
-    listStr := ""
+    ; Populate ListView
     for index, hk in HotkeyList {
-        listStr .= hk "|"
+        LV_Add("", hk)
     }
-    GuiControl, Rearrange:, RearrangeListBox, |%listStr%
+    LV_ModifyCol(1, "180 Left")
+    if (HotkeyList.Count() > 0)
+        LV_Modify(1, "Select Focus")
 
-    Gui, Rearrange:Show, w300 h290
+    ; Right column: Action buttons
+    Gui, Rearrange:Add, Text, x200 y10 w90, Actions:
+    Gui, Rearrange:Add, Button, x200 y35 w90 h30 gRearrangeMoveUp, Move Up
+    Gui, Rearrange:Add, Button, x200 y75 w90 h30 gRearrangeMoveDown, Move Down
+    Gui, Rearrange:Add, Button, x200 y115 w90 h30 gRearrangeApply Default, Apply
+    Gui, Rearrange:Add, Button, x200 y155 w90 h30 gRearrangeCancel, Cancel
+
+    Gui, Rearrange:Show, w300 h250
 return
 
 ; Move selected item up
 RearrangeMoveUp:
-    GuiControlGet, selectedIndex, Rearrange:, RearrangeListBox
+    Gui, Rearrange:Default
+    selectedIndex := LV_GetNext(0)
     if (selectedIndex <= 1) {
         MsgBox, 48, Info, Cannot move first item up!
         return
     }
-
-    ; Get the item
-    GuiControl, Rearrange:, RearrangeListBox, -Redraw
-    GuiControlGet, item, Rearrange:, RearrangeListBox
 
     ; Update array
     temp := HotkeyList[selectedIndex]
     HotkeyList[selectedIndex] := HotkeyList[selectedIndex - 1]
     HotkeyList[selectedIndex - 1] := temp
 
-    ; Refresh list
-    listStr := ""
+    ; Refresh ListView
+    LV_Delete()
     for index, hk in HotkeyList {
-        listStr .= hk "|"
+        LV_Add("", hk)
     }
-    GuiControl, Rearrange:, RearrangeListBox, |%listStr%
-    GuiControl, Rearrange:, RearrangeListBox, +Redraw
-    GuiControl, Rearrange:Choose, RearrangeListBox, % selectedIndex - 1
+    LV_Modify(selectedIndex - 1, "Select Focus Vis")
 return
 
 ; Move selected item down
 RearrangeMoveDown:
-    GuiControlGet, selectedIndex, Rearrange:, RearrangeListBox
-    if (selectedIndex >= HotkeyList.Count()) {
+    Gui, Rearrange:Default
+    selectedIndex := LV_GetNext(0)
+    if (selectedIndex = 0 || selectedIndex >= HotkeyList.Count()) {
         MsgBox, 48, Info, Cannot move last item down!
         return
     }
@@ -300,13 +379,12 @@ RearrangeMoveDown:
     HotkeyList[selectedIndex] := HotkeyList[selectedIndex + 1]
     HotkeyList[selectedIndex + 1] := temp
 
-    ; Refresh list
-    listStr := ""
+    ; Refresh ListView
+    LV_Delete()
     for index, hk in HotkeyList {
-        listStr .= hk "|"
+        LV_Add("", hk)
     }
-    GuiControl, Rearrange:, RearrangeListBox, |%listStr%
-    GuiControl, Rearrange:Choose, RearrangeListBox, % selectedIndex + 1
+    LV_Modify(selectedIndex + 1, "Select Focus Vis")
 return
 
 ; Apply new order to INI file
@@ -494,7 +572,7 @@ ConfirmKey:
     Gui, KeyDetect:Submit, NoHide
 
     if (DetectedKey = "") {
-        MsgBox, 48, Error, Please detect a key first!
+        UpdateStatus("Error: Please detect a key first!")
         return
     }
 
@@ -562,8 +640,9 @@ ConfirmKey:
         IniWrite, %A_Space%, %ConfigFile%, %section%, left
         IniWrite, %A_Space%, %ConfigFile%, %section%, right
         IniWrite, %normalizedHotkey%, %ConfigFile%, %section%, default
+        UpdateStatus("Button added successfully.")
     } else {
-        MsgBox, 48, Info, Button already exists!
+        UpdateStatus("Error: Button already exists!")
         return
     }
 
@@ -658,6 +737,59 @@ SaveCurrentChanges() {
     PendingChanges[CurrentHotkey].default := ActionDefault
 }
 
+; Rename button - updates button name in pending changes to be saved later
+RenameButton:
+    global CurrentHotkey, HotkeyList, PendingChanges
+
+    Gui, Config:Submit, NoHide
+
+    if (CurrentHotkey = "" || SelectedButtonDisplay = "") {
+        return
+    }
+
+    ; Trim the new name
+    newButtonName := Trim(SelectedButtonDisplay)
+
+    ; Check if name is empty or hasn't changed
+    if (newButtonName = "" || newButtonName = CurrentHotkey) {
+        GuiControl, Config:, SelectedButtonDisplay, %CurrentHotkey%
+        return
+    }
+
+    ; Check if the new name already exists
+    for index, hk in HotkeyList {
+        if (hk = newButtonName) {
+            MsgBox, 48, Error, Button "%newButtonName%" already exists!
+            GuiControl, Config:, SelectedButtonDisplay, %CurrentHotkey%
+            return
+        }
+    }
+
+    ; Update HotkeyList array with new name
+    for index, hk in HotkeyList {
+        if (hk = CurrentHotkey) {
+            HotkeyList[index] := newButtonName
+            break
+        }
+    }
+
+    ; Store rename operation in pending changes
+    ; If there are existing changes for CurrentHotkey, move them to the new name
+    if (PendingChanges.HasKey(CurrentHotkey)) {
+        PendingChanges[newButtonName] := PendingChanges[CurrentHotkey]
+        PendingChanges[CurrentHotkey] := {renamed_to: newButtonName}
+    } else {
+        PendingChanges[CurrentHotkey] := {renamed_to: newButtonName}
+    }
+
+    ; Update CurrentHotkey to the new name
+    CurrentHotkey := newButtonName
+
+    ; Refresh the list
+    RefreshHotkeyList()
+    UpdateStatus("Button renamed (pending save).")
+return
+
 ; Load all buttons from INI file into HotkeyList
 LoadConfig() {
     global ConfigFile, HotkeyList, MoveThreshold
@@ -738,6 +870,41 @@ RefreshHotkeyList() {
     GuiControl, Config:, HotkeyListBox, |%listStr%
 }
 
+; Show or hide the button properties section
+ShowButtonProperties(show) {
+    if (show) {
+        GuiControl, Config:Show, SelectedButtonDisplay
+        GuiControl, Config:Show, ButtonMode
+        GuiControl, Config:Show, ActionUp
+        GuiControl, Config:Show, ActionLeft
+        GuiControl, Config:Show, ActionRight
+        GuiControl, Config:Show, ActionDown
+        GuiControl, Config:Show, ActionDefault
+        GuiControl, Config:Show, StatusText
+    } else {
+        GuiControl, Config:Hide, SelectedButtonDisplay
+        GuiControl, Config:Hide, ButtonMode
+        GuiControl, Config:Hide, ActionUp
+        GuiControl, Config:Hide, ActionLeft
+        GuiControl, Config:Hide, ActionRight
+        GuiControl, Config:Hide, ActionDown
+        GuiControl, Config:Hide, ActionDefault
+        GuiControl, Config:Hide, StatusText
+    }
+}
+
+; Clear button properties when no button is selected
+ClearButtonProperties() {
+    GuiControl, Config:, HotkeyListBox, 
+    GuiControl, Config:, ButtonMode, 
+    GuiControl, Config:, AimDelay, 
+    GuiControl, Config:, ActionUp, 
+    GuiControl, Config:, ActionDown, 
+    GuiControl, Config:, ActionLeft, 
+    GuiControl, Config:, ActionRight, 
+    GuiControl, Config:, ActionDefault, 
+}
+
 ; Update LoadHotkeyData to populate the GUI for all buttons
 LoadHotkeyData(hotkey) {
     global ConfigFile, PendingChanges
@@ -779,6 +946,7 @@ LoadHotkeyData(hotkey) {
     displayMode := ConvertModeToDisplay(mode)
 
     ; Update form controls for preloading
+    GuiControl, Config:, SelectedButtonDisplay, %hotkey%
     GuiControl, Config:ChooseString, ButtonMode, %displayMode%
     GuiControl, Config:, AimDelay, %aimDelay%
 
