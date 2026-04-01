@@ -298,23 +298,45 @@ ScreenRotateOSD() {
     dy := yB - yA
     direction := ResolveDirection(dx, dy, MoveThreshold)
 
-    Log("ScreenRotate gesture dx: " dx " dy: " dy " dir: " direction)
+    targetDisplay := GetMonitorNameFromPoint(xB, yB)
+    Log("ScreenRotate gesture dx: " dx " dy: " dy " dir: " direction " display: " targetDisplay)
 
     ; Map gesture direction to rotation angle.
     if (direction = "up") {
-        RotateDisplay(180)
+        RotateDisplay(180, targetDisplay)
     } else if (direction = "right") {
-        RotateDisplay(90)
+        result := RotateDisplay(90, targetDisplay)
+        if (result = 2) {
+            Log("ScreenRotateOSD: portrait unsupported, fallback right -> 0")
+            RotateDisplay(0, targetDisplay)
+        }
     } else if (direction = "down") {
-        RotateDisplay(0)
+        RotateDisplay(0, targetDisplay)
     } else if (direction = "left") {
-        RotateDisplay(270)
+        result := RotateDisplay(270, targetDisplay)
+        if (result = 2) {
+            Log("ScreenRotateOSD: portrait unsupported, fallback left -> 180")
+            RotateDisplay(180, targetDisplay)
+        }
     } else {
         Log("ScreenRotateOSD: no significant movement")
     }
 }
 
-RotateDisplay(angle) {
+GetMonitorNameFromPoint(x, y) {
+    SysGet, monCount, MonitorCount
+    Loop, %monCount% {
+        idx := A_Index
+        SysGet, mon, Monitor, %idx%
+        if (x >= monLeft && x < monRight && y >= monTop && y < monBottom) {
+            SysGet, monName, MonitorName, %idx%
+            return monName
+        }
+    }
+    return ""
+}
+
+RotateDisplay(angle, deviceName:="") {
     ; angle: 0, 90, 180, 270
     static DM_DISPLAYORIENTATION := 0x80
     static DM_PELSWIDTH := 0x80000
@@ -322,16 +344,21 @@ RotateDisplay(angle) {
 
     if (angle != 0 && angle != 90 && angle != 180 && angle != 270) {
         Log("RotateDisplay invalid angle: " angle)
-        return
+        return 3
     }
 
     dmSize := (A_PtrSize = 8) ? 220 : 156
     VarSetCapacity(dm, dmSize, 0)
     NumPut(dmSize, dm, 68, "UShort") ; dmSize
 
-    if (!DllCall("EnumDisplaySettings", "ptr", 0, "uint", -1, "ptr", &dm)) {
+    if (deviceName = "") {
+        enumOk := DllCall("EnumDisplaySettings", "ptr", 0, "uint", -1, "ptr", &dm)
+    } else {
+        enumOk := DllCall("EnumDisplaySettings", "str", deviceName, "uint", -1, "ptr", &dm)
+    }
+    if (!enumOk) {
         Log("RotateDisplay: EnumDisplaySettings failed")
-        return
+        return 3
     }
 
     orientMap := {0: 0, 90: 1, 180: 2, 270: 3}
@@ -339,7 +366,7 @@ RotateDisplay(angle) {
     curOrient := NumGet(dm, 84, "UInt")
     if (curOrient = newOrient) {
         Log("RotateDisplay: already at " angle)
-        return
+        return 0
     }
 
     curW := NumGet(dm, 108, "UInt")
@@ -360,7 +387,11 @@ RotateDisplay(angle) {
     NumPut(dmFields, dm, 72, "UInt")
     NumPut(newOrient, dm, 84, "UInt")
 
-    result := DllCall("ChangeDisplaySettings", "ptr", &dm, "uint", 0)
+    if (deviceName = "") {
+        result := DllCall("ChangeDisplaySettings", "ptr", &dm, "uint", 0)
+    } else {
+        result := DllCall("ChangeDisplaySettingsEx", "str", deviceName, "ptr", &dm, "ptr", 0, "uint", 0, "ptr", 0)
+    }
     Log("RotateDisplay result: " result " -> angle " angle)
     if (result = 1) {
         MsgBox, 48, DGlider, Display rotation applied. A restart may be required.
@@ -369,6 +400,7 @@ RotateDisplay(angle) {
     } else if (result != 0) {
         MsgBox, 16, DGlider, Display rotation failed. Result code: %result%
     }
+    return result
 }
 
 ;------------------------------- Profile Management ------------------------------
@@ -461,23 +493,6 @@ return
 ProfSelGuiClose:
     Gui, ProfSel:Destroy
 return
-
-; This is for my personal use, delete it if you want
-; Japanese key remappings
-SC07B::Send, {Space}        ; First key = Spacebar
-SC079::Send, {Space}        ; Second key = Spacebar
-
-SC070::Send, {Backspace}    ; Always send Ctrl+Backspace
-+SC070::Send, {Backspace}  ; Always send Ctrl+Backspace
-^SC070::Send, ^{Backspace}  ; Always send Ctrl+Backspace
-
-^SC07D::Send, ^{Backspace}  ; Always send Ctrl+Backspace
-SC07D::Send, {Backspace}    ; Always send Ctrl+Backspace
-+SC07D::Send, {Backspace}  ; Always send Ctrl+Backspace
-
-SC073::Send, ^v             ; Fifth key = Ctrl+V
-#K::
-    Run, ms-settings:connecteddevices
 
     ;----------------------------------- Timer OSD Function -----------------------------------
 
@@ -603,3 +618,22 @@ TimerReset() {
     SetTimer, TimerUpdateLoop, Off
     Log("Timer reset")
 }
+
+
+; ----------------------------------------------------------------------
+
+; This is for my personal use, delete it if you want, This sections should be keep at the bottom
+; Japanese keyboard remappings
+SC07B::Send, {Space}        ; First key = Spacebar
+SC079::Send, {Space}        ; Second key = Spacebar
+
+SC070::Send, {Backspace}    ; Always send Ctrl+Backspace
++SC070::Send, {Backspace}  ; Always send Ctrl+Backspace
+^SC070::Send, ^{Backspace}  ; Always send Ctrl+Backspace
+
+^SC07D::Send, ^{Backspace}  ; Always send Ctrl+Backspace
+SC07D::Send, {Backspace}    ; Always send Ctrl+Backspace
++SC07D::Send, {Backspace}  ; Always send Ctrl+Backspace
+
+SC073::Send, ^v             ; Fifth key = Ctrl+V
++Space:: send _
