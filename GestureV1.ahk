@@ -22,23 +22,24 @@ if (_cfgThreshold != "")
     MoveThreshold := _cfgThreshold
 
 VolOSD_Active := 0
-DebtOSD_Visible := 0
-DebtOSD_GuiHwnd := 0
-DebtOSD_BaseAmount := 0
-DebtOSD_DeltaPerSecond := 0
-DebtOSD_CurrencyPrefix := "$"
-DebtOSD_CurrencySuffix := ""
-DebtOSD_Decimals := 2
-DebtOSD_PosX := 50
-DebtOSD_PosY := 90
-DebtOSD_Width := 240
-DebtOSD_FontSize := 18
-DebtOSD_TextColor := "FF8080"
-DebtOSD_BackgroundColor := "1B1B1B"
-DebtOSD_LastWholeSeconds := -1
-DebtOSD_BaseTimestamp := A_Now
+Timer_Visible := 0
+Timer_GuiHwnd := 0
+Timer_BaseAmount := 0
+Timer_DeltaPerSecond := 0
+Timer_CurrencyPrefix := "$"
+Timer_CurrencySuffix := ""
+Timer_Decimals := 2
+Timer_PosX := 50
+Timer_PosY := 50
+Timer_Width := 240
+Timer_FontSize := 18
+Timer_TextColor := "FF8080"
+Timer_BackgroundColor := "1B1B1B"
+Timer_LastWholeSeconds := -1
+Timer_BaseTimestamp := A_Now
+TimerDisplayCtrl := ""
 
-DebtOSD_LoadConfig()
+Timer_LoadConfig()
 
 ; Initialize mouse-button hotkeys based on current profile
 SetupMouseButtonHotkeys()
@@ -514,309 +515,227 @@ return
     ;----------------------------------- Timer OSD Function -----------------------------------
 
     TimerToggle() {
-        global Timer_State, Timer_StartTime, Timer_Accumulated, Timer_GuiHwnd, TimerDisplay, Timer_Visible
+        global Timer_Visible
 
-        ; Initialize variables
-        if (Timer_State = "") {
-            Timer_State := 0        ; 0: Stopped/Paused, 1: Running
-            Timer_Accumulated := 0
-            Timer_Visible := 0
-        }
-
-        ; --- LOGIC: STOPPED -> START ---
-        if (Timer_State = 0 && Timer_Accumulated = 0) {
-            Timer_State := 1
-            Timer_StartTime := A_TickCount
+        if (Timer_Visible) {
+            Timer_Hide()
+            Log("Timer OSD hidden")
+        } else {
             Timer_Show()
-            Log("Timer Started")
-            return
-        }
-
-        ; --- LOGIC: PAUSED -> RESUME ---
-        if (Timer_State = 0 && Timer_Accumulated > 0) {
-            Timer_State := 1
-            Timer_StartTime := A_TickCount
-            Timer_Show()
-            Log("Timer Resumed")
-            return
-        }
-
-        ; --- LOGIC: RUNNING ---
-        if (Timer_State = 1) {
-            if (Timer_Visible) {
-                ; If Running AND Visible -> PAUSE
-                Timer_State := 0
-                Timer_Accumulated += (A_TickCount - Timer_StartTime)
-
-                ; Visual feedback for Pause
-                Gui, TimerOSD:Font, cYellow
-                GuiControl, TimerOSD:Font, TimerDisplay
-                GuiControl, TimerOSD:, TimerDisplay, % FormatTimer(Timer_Accumulated)
-
-                ; Keep visible for a bit then hide
-                SetTimer, TimerAutoHide, -4000
-                Log("Timer Paused")
-            } else {
-                ; If Running AND Hidden -> PEEK (Show briefly)
-                Timer_Show()
-                Log("Timer Peek")
-            }
+            Log("Timer OSD shown")
         }
     }
 
     Timer_Show() {
-        global Timer_GuiHwnd, TimerDisplay, Timer_Visible, Timer_State
+        global Timer_GuiHwnd, Timer_Visible, Timer_PosX, Timer_PosY, Timer_Width
+        global Timer_FontSize, Timer_TextColor, Timer_BackgroundColor, Timer_LastWholeSeconds
+        global TimerDisplayCtrl
 
         if (!Timer_GuiHwnd) {
+            timerDisplayOpts := "vTimerDisplayCtrl Center w" Timer_Width
             Gui, TimerOSD:New, +AlwaysOnTop +ToolWindow -Caption +HwndTimer_GuiHwnd
-            Gui, TimerOSD:Color, 222222
-            Gui, TimerOSD:Font, s16 w700, Segoe UI
-            Gui, TimerOSD:Add, Text, vTimerDisplay c00FF00 Center w180, 00:00:00
+            Gui, TimerOSD:Color, %Timer_BackgroundColor%
+            Gui, TimerOSD:Margin, 14, 10
+            Gui, TimerOSD:Font, s%Timer_FontSize% w700 c%Timer_TextColor%, Segoe UI
+            Gui, TimerOSD:Add, Text, %timerDisplayOpts%, 0.00
         }
 
-        ; Reset color to Green if running
-        if (Timer_State = 1) {
-            Gui, TimerOSD:Font, c00FF00
-            GuiControl, TimerOSD:Font, TimerDisplay
-        }
-
-        ; Update immediately before showing
-        GoSub, TimerUpdateLoop
-
-        Gui, TimerOSD:Show, NoActivate x50 y50, TimerOSD
         Timer_Visible := 1
+        Timer_LastWholeSeconds := -1
+        GoSub, TimerUpdateLoop
+        Gui, TimerOSD:Show, NoActivate x%Timer_PosX% y%Timer_PosY%, TimerOSD
+        SetTimer, TimerUpdateLoop, 250
+    }
 
-        ; Start updating loop
-        SetTimer, TimerUpdateLoop, 100
+    Timer_Hide() {
+        global Timer_Visible
 
-        ; Auto hide after 3 seconds (Peek mode)
-        SetTimer, TimerAutoHide, -3000
+        Gui, TimerOSD:Hide
+        Timer_Visible := 0
+        SetTimer, TimerUpdateLoop, Off
+    }
+
+    Timer_LoadConfig() {
+        global Timer_BaseAmount, Timer_DeltaPerSecond, Timer_CurrencyPrefix, Timer_CurrencySuffix
+        global Timer_Decimals, Timer_PosX, Timer_PosY, Timer_Width, Timer_FontSize
+        global Timer_TextColor, Timer_BackgroundColor, Timer_BaseTimestamp
+
+        IniRead, Timer_BaseAmount, %A_ScriptDir%\gesture_config.ini, TimerOSD, InitialAmount, 0
+        IniRead, Timer_DeltaPerSecond, %A_ScriptDir%\gesture_config.ini, TimerOSD, DeltaPerSecond, 0
+        IniRead, Timer_BaseTimestamp, %A_ScriptDir%\gesture_config.ini, TimerOSD, BaseTimestamp, %A_Now%
+        IniRead, Timer_CurrencyPrefix, %A_ScriptDir%\gesture_config.ini, TimerOSD, CurrencyPrefix, $
+        IniRead, Timer_CurrencySuffix, %A_ScriptDir%\gesture_config.ini, TimerOSD, CurrencySuffix,
+        IniRead, Timer_Decimals, %A_ScriptDir%\gesture_config.ini, TimerOSD, Decimals, 2
+        IniRead, Timer_PosX, %A_ScriptDir%\gesture_config.ini, TimerOSD, PosX, 50
+        IniRead, Timer_PosY, %A_ScriptDir%\gesture_config.ini, TimerOSD, PosY, 50
+        IniRead, Timer_Width, %A_ScriptDir%\gesture_config.ini, TimerOSD, Width, 240
+        IniRead, Timer_FontSize, %A_ScriptDir%\gesture_config.ini, TimerOSD, FontSize, 18
+        IniRead, Timer_TextColor, %A_ScriptDir%\gesture_config.ini, TimerOSD, TextColor, FF8080
+        IniRead, Timer_BackgroundColor, %A_ScriptDir%\gesture_config.ini, TimerOSD, BackgroundColor, 1B1B1B
+
+        Timer_BaseAmount += 0
+        Timer_DeltaPerSecond += 0
+        Timer_Decimals += 0
+        Timer_PosX += 0
+        Timer_PosY += 0
+        Timer_Width += 0
+        Timer_FontSize += 0
+        Timer_BaseTimestamp := Timer_NormalizeTimestamp(Timer_BaseTimestamp)
+        if (Timer_BaseTimestamp = "")
+            Timer_BaseTimestamp := A_Now
+    }
+
+    TimerConfig() {
+        global Timer_BaseAmount, Timer_DeltaPerSecond, Timer_CurrencyPrefix, Timer_CurrencySuffix
+        global Timer_Visible, Timer_LastWholeSeconds, Timer_BaseTimestamp
+
+        currentAmount := Timer_GetCurrentAmount()
+
+        InputBox, newAmount, Timer OSD, Current amount from right now:, , 360, 150,,,,, %currentAmount%
+        if (ErrorLevel)
+            return
+        if newAmount is not number
+        {
+            MsgBox, 48, DGlider, Current amount must be numeric.
+            return
+        }
+
+        InputBox, newDelta, Timer OSD, Change per second:`nUse negative to count down., , 360, 170,,,,, %Timer_DeltaPerSecond%
+        if (ErrorLevel)
+            return
+        if newDelta is not number
+        {
+            MsgBox, 48, DGlider, Change per second must be numeric.
+            return
+        }
+
+        InputBox, newPrefix, Timer OSD, Currency prefix (example: $):, , 360, 150,,,,, %Timer_CurrencyPrefix%
+        if (ErrorLevel)
+            return
+
+        InputBox, newSuffix, Timer OSD, Currency suffix (optional):, , 360, 150,,,,, %Timer_CurrencySuffix%
+        if (ErrorLevel)
+            return
+
+        InputBox, newTimestamp, Timer OSD, Base timestamp:`nyyyyMMddHHmmss or yyyy-MM-dd HH:mm:ss`nLeave blank to use current time., , 420, 190,,,,, %Timer_BaseTimestamp%
+        if (ErrorLevel)
+            return
+
+        newTimestamp := Timer_NormalizeTimestamp(newTimestamp)
+        if (newTimestamp = "")
+        {
+            MsgBox, 48, DGlider, Base timestamp is invalid.`nUse yyyyMMddHHmmss or yyyy-MM-dd HH:mm:ss.
+            return
+        }
+
+        Timer_BaseAmount := newAmount + 0
+        Timer_DeltaPerSecond := newDelta + 0
+        Timer_CurrencyPrefix := newPrefix
+        Timer_CurrencySuffix := newSuffix
+        Timer_BaseTimestamp := newTimestamp
+        Timer_LastWholeSeconds := -1
+
+        IniWrite, %Timer_BaseAmount%, %A_ScriptDir%\gesture_config.ini, TimerOSD, InitialAmount
+        IniWrite, %Timer_DeltaPerSecond%, %A_ScriptDir%\gesture_config.ini, TimerOSD, DeltaPerSecond
+        IniWrite, %Timer_BaseTimestamp%, %A_ScriptDir%\gesture_config.ini, TimerOSD, BaseTimestamp
+        IniWrite, %Timer_CurrencyPrefix%, %A_ScriptDir%\gesture_config.ini, TimerOSD, CurrencyPrefix
+        IniWrite, %Timer_CurrencySuffix%, %A_ScriptDir%\gesture_config.ini, TimerOSD, CurrencySuffix
+
+        if (Timer_Visible)
+            GoSub, TimerUpdateLoop
+
+        Log("Timer OSD config updated: amount=" Timer_BaseAmount " delta=" Timer_DeltaPerSecond)
+    }
+
+    TimerReset() {
+        global Timer_BaseAmount, Timer_BaseTimestamp, Timer_LastWholeSeconds, Timer_Visible
+
+        Timer_BaseAmount := 0
+        Timer_BaseTimestamp := A_Now
+        Timer_LastWholeSeconds := -1
+        IniWrite, %Timer_BaseAmount%, %A_ScriptDir%\gesture_config.ini, TimerOSD, InitialAmount
+        IniWrite, %Timer_BaseTimestamp%, %A_ScriptDir%\gesture_config.ini, TimerOSD, BaseTimestamp
+        if (Timer_Visible)
+            GoSub, TimerUpdateLoop
+        Log("Timer OSD amount reset")
+    }
+
+    Timer_GetCurrentAmount() {
+        global Timer_BaseAmount, Timer_DeltaPerSecond
+
+        elapsedWholeSeconds := Timer_GetElapsedWholeSeconds()
+        return Timer_BaseAmount + (elapsedWholeSeconds * Timer_DeltaPerSecond)
+    }
+
+    Timer_GetElapsedWholeSeconds() {
+        global Timer_BaseTimestamp
+
+        nowStamp := A_Now
+        EnvSub, nowStamp, %Timer_BaseTimestamp%, Seconds
+        if nowStamp is not number
+            return 0
+        return Floor(nowStamp)
+    }
+
+    Timer_NormalizeTimestamp(ts) {
+        ts := Trim(ts)
+        if (ts = "")
+            return A_Now
+
+        if (SubStr(ts, 1, 14) = "BaseTimestamp=")
+            ts := SubStr(ts, 15)
+
+        ts := RegExReplace(ts, "[^\d]")
+        if (StrLen(ts) = 14)
+            return ts
+
+        return ""
+    }
+
+    Timer_FormatAmount(amount) {
+        global Timer_CurrencyPrefix, Timer_CurrencySuffix, Timer_Decimals
+
+        sign := (amount < 0) ? "-" : ""
+        absValue := Abs(amount)
+        formattedAbs := Format("{:." Timer_Decimals "f}", absValue)
+        dotPos := InStr(formattedAbs, ".")
+
+        if (dotPos > 0) {
+            intPart := SubStr(formattedAbs, 1, dotPos - 1)
+            fracPart := SubStr(formattedAbs, dotPos + 1)
+            return sign . Timer_CurrencyPrefix . Timer_AddThousandsSeparators(intPart) . "." . fracPart . Timer_CurrencySuffix
+        }
+
+        return sign . Timer_CurrencyPrefix . Timer_AddThousandsSeparators(formattedAbs) . Timer_CurrencySuffix
+    }
+
+    Timer_AddThousandsSeparators(intPart) {
+        out := ""
+        len := StrLen(intPart)
+
+        Loop, %len%
+        {
+            idx := len - A_Index + 1
+            digit := SubStr(intPart, idx, 1)
+            if (A_Index > 1 && Mod(A_Index - 1, 3) = 0)
+                out := "," . out
+            out := digit . out
+        }
+
+        return out
     }
 
 TimerUpdateLoop:
-    if (Timer_State = 1) {
-        CurrentDuration := (A_TickCount - Timer_StartTime) + Timer_Accumulated
-        GuiControl, TimerOSD:, TimerDisplay, % FormatTimer(CurrentDuration)
-    }
-return
-
-TimerAutoHide:
-    Gui, TimerOSD:Hide
-    Timer_Visible := 0
-    ; Don't stop the loop if running, just stop updating UI?
-    ; Actually, we can keep loop running or stop it to save CPU.
-    ; Let's stop UI updates to save resources if hidden.
-    if (Timer_State = 1) {
-        SetTimer, TimerUpdateLoop, Off
-    }
-return
-
-FormatTimer(ms) {
-    totalSec := Floor(ms / 1000)
-    hours := Floor(totalSec / 3600)
-    rem := Mod(totalSec, 3600)
-    mins := Floor(rem / 60)
-    secs := Mod(rem, 60)
-
-    ; Format HH:MM:SS
-    hrStr := (hours < 10) ? "0" . hours : hours
-    minStr := (mins < 10) ? "0" . mins : mins
-    secStr := (secs < 10) ? "0" . secs : secs
-    return hrStr . ":" . minStr . ":" . secStr
-}
-
-TimerReset() {
-    global Timer_State, Timer_Accumulated, Timer_Visible
-    Timer_State := 0
-    Timer_Accumulated := 0
-    GuiControl, TimerOSD:, TimerDisplay, 00:00:00
-    Gui, TimerOSD:Hide
-    Timer_Visible := 0
-    SetTimer, TimerUpdateLoop, Off
-    Log("Timer reset")
-}
-
-DebtOSDToggle() {
-    global DebtOSD_Visible
-
-    if (DebtOSD_Visible) {
-        DebtOSD_Hide()
-        Log("DebtOSD hidden")
-    } else {
-        DebtOSD_Show()
-        Log("DebtOSD shown")
-    }
-}
-
-DebtOSD_Show() {
-    global DebtOSD_GuiHwnd, DebtOSD_Visible, DebtOSD_PosX, DebtOSD_PosY, DebtOSD_Width
-    global DebtOSD_FontSize, DebtOSD_TextColor, DebtOSD_BackgroundColor
-    global DebtOSD_LastWholeSeconds
-
-    if (!DebtOSD_GuiHwnd) {
-        Gui, DebtOSD:New, +AlwaysOnTop +ToolWindow -Caption +HwndDebtOSD_GuiHwnd
-        Gui, DebtOSD:Color, %DebtOSD_BackgroundColor%
-        Gui, DebtOSD:Margin, 14, 10
-        Gui, DebtOSD:Font, s%DebtOSD_FontSize% w700 c%DebtOSD_TextColor%, Segoe UI
-        Gui, DebtOSD:Add, Text, vDebtOSD_Value Center w%DebtOSD_Width%, $0.00
-    }
-
-    DebtOSD_Visible := 1
-    DebtOSD_LastWholeSeconds := -1
-    GoSub, DebtOSD_UpdateLoop
-    Gui, DebtOSD:Show, NoActivate x%DebtOSD_PosX% y%DebtOSD_PosY%, DebtOSD
-    SetTimer, DebtOSD_UpdateLoop, 250
-}
-
-DebtOSD_Hide() {
-    global DebtOSD_Visible
-
-    Gui, DebtOSD:Hide
-    DebtOSD_Visible := 0
-    SetTimer, DebtOSD_UpdateLoop, Off
-}
-
-DebtOSD_LoadConfig() {
-    global DebtOSD_BaseAmount, DebtOSD_DeltaPerSecond, DebtOSD_CurrencyPrefix, DebtOSD_CurrencySuffix
-    global DebtOSD_Decimals, DebtOSD_PosX, DebtOSD_PosY, DebtOSD_Width, DebtOSD_FontSize
-    global DebtOSD_TextColor, DebtOSD_BackgroundColor, DebtOSD_BaseTimestamp
-
-    IniRead, DebtOSD_BaseAmount, %A_ScriptDir%\gesture_config.ini, DebtOSD, InitialAmount, 0
-    IniRead, DebtOSD_DeltaPerSecond, %A_ScriptDir%\gesture_config.ini, DebtOSD, DeltaPerSecond, 0
-    IniRead, DebtOSD_BaseTimestamp, %A_ScriptDir%\gesture_config.ini, DebtOSD, BaseTimestamp, %A_Now%
-    IniRead, DebtOSD_CurrencyPrefix, %A_ScriptDir%\gesture_config.ini, DebtOSD, CurrencyPrefix, $
-    IniRead, DebtOSD_CurrencySuffix, %A_ScriptDir%\gesture_config.ini, DebtOSD, CurrencySuffix,
-    IniRead, DebtOSD_Decimals, %A_ScriptDir%\gesture_config.ini, DebtOSD, Decimals, 2
-    IniRead, DebtOSD_PosX, %A_ScriptDir%\gesture_config.ini, DebtOSD, PosX, 50
-    IniRead, DebtOSD_PosY, %A_ScriptDir%\gesture_config.ini, DebtOSD, PosY, 90
-    IniRead, DebtOSD_Width, %A_ScriptDir%\gesture_config.ini, DebtOSD, Width, 240
-    IniRead, DebtOSD_FontSize, %A_ScriptDir%\gesture_config.ini, DebtOSD, FontSize, 18
-    IniRead, DebtOSD_TextColor, %A_ScriptDir%\gesture_config.ini, DebtOSD, TextColor, FF8080
-    IniRead, DebtOSD_BackgroundColor, %A_ScriptDir%\gesture_config.ini, DebtOSD, BackgroundColor, 1B1B1B
-
-    DebtOSD_BaseAmount += 0
-    DebtOSD_DeltaPerSecond += 0
-    DebtOSD_Decimals += 0
-    DebtOSD_PosX += 0
-    DebtOSD_PosY += 0
-    DebtOSD_Width += 0
-    DebtOSD_FontSize += 0
-    if (DebtOSD_BaseTimestamp = "")
-        DebtOSD_BaseTimestamp := A_Now
-}
-
-DebtOSDConfig() {
-    global DebtOSD_BaseAmount, DebtOSD_DeltaPerSecond, DebtOSD_CurrencyPrefix, DebtOSD_CurrencySuffix
-    global DebtOSD_Visible, DebtOSD_LastWholeSeconds, DebtOSD_BaseTimestamp
-
-    currentAmount := DebtOSD_GetCurrentAmount()
-
-    InputBox, newAmount, Debt OSD, Starting amount from right now:, , 360, 150,,,,, %currentAmount%
-    if (ErrorLevel)
-        return
-    if newAmount is not number
-    {
-        MsgBox, 48, DGlider, Starting amount must be numeric.
-        return
-    }
-
-    InputBox, newDelta, Debt OSD, Change per second:`nUse negative to count down., , 360, 170,,,,, %DebtOSD_DeltaPerSecond%
-    if (ErrorLevel)
-        return
-    if newDelta is not number
-    {
-        MsgBox, 48, DGlider, Change per second must be numeric.
-        return
-    }
-
-    InputBox, newPrefix, Debt OSD, Currency prefix (example: $):, , 360, 150,,,,, %DebtOSD_CurrencyPrefix%
-    if (ErrorLevel)
+    if (!Timer_Visible)
         return
 
-    InputBox, newSuffix, Debt OSD, Currency suffix (optional):, , 360, 150,,,,, %DebtOSD_CurrencySuffix%
-    if (ErrorLevel)
+    elapsedWholeSeconds := Timer_GetElapsedWholeSeconds()
+    if (elapsedWholeSeconds = Timer_LastWholeSeconds)
         return
 
-    DebtOSD_BaseAmount := newAmount + 0
-    DebtOSD_DeltaPerSecond := newDelta + 0
-    DebtOSD_CurrencyPrefix := newPrefix
-    DebtOSD_CurrencySuffix := newSuffix
-    DebtOSD_BaseTimestamp := A_Now
-    DebtOSD_LastWholeSeconds := -1
-
-    IniWrite, %DebtOSD_BaseAmount%, %A_ScriptDir%\gesture_config.ini, DebtOSD, InitialAmount
-    IniWrite, %DebtOSD_DeltaPerSecond%, %A_ScriptDir%\gesture_config.ini, DebtOSD, DeltaPerSecond
-    IniWrite, %DebtOSD_BaseTimestamp%, %A_ScriptDir%\gesture_config.ini, DebtOSD, BaseTimestamp
-    IniWrite, %DebtOSD_CurrencyPrefix%, %A_ScriptDir%\gesture_config.ini, DebtOSD, CurrencyPrefix
-    IniWrite, %DebtOSD_CurrencySuffix%, %A_ScriptDir%\gesture_config.ini, DebtOSD, CurrencySuffix
-
-    if (DebtOSD_Visible)
-        GoSub, DebtOSD_UpdateLoop
-
-    Log("DebtOSD config updated: amount=" DebtOSD_BaseAmount " delta=" DebtOSD_DeltaPerSecond)
-}
-
-DebtOSD_GetCurrentAmount() {
-    global DebtOSD_BaseAmount, DebtOSD_DeltaPerSecond
-
-    elapsedWholeSeconds := DebtOSD_GetElapsedWholeSeconds()
-    return DebtOSD_BaseAmount + (elapsedWholeSeconds * DebtOSD_DeltaPerSecond)
-}
-
-DebtOSD_GetElapsedWholeSeconds() {
-    global DebtOSD_BaseTimestamp
-
-    nowStamp := A_Now
-    EnvSub, nowStamp, %DebtOSD_BaseTimestamp%, Seconds
-    if nowStamp is not number
-        return 0
-    return Floor(nowStamp)
-}
-
-DebtOSD_FormatAmount(amount) {
-    global DebtOSD_CurrencyPrefix, DebtOSD_CurrencySuffix, DebtOSD_Decimals
-
-    sign := (amount < 0) ? "-" : ""
-    absValue := Abs(amount)
-    formattedAbs := Format("{:." DebtOSD_Decimals "f}", absValue)
-    dotPos := InStr(formattedAbs, ".")
-
-    if (dotPos > 0) {
-        intPart := SubStr(formattedAbs, 1, dotPos - 1)
-        fracPart := SubStr(formattedAbs, dotPos + 1)
-        return sign . DebtOSD_CurrencyPrefix . DebtOSD_AddThousandsSeparators(intPart) . "." . fracPart . DebtOSD_CurrencySuffix
-    }
-
-    return sign . DebtOSD_CurrencyPrefix . DebtOSD_AddThousandsSeparators(formattedAbs) . DebtOSD_CurrencySuffix
-}
-
-DebtOSD_AddThousandsSeparators(intPart) {
-    out := ""
-    len := StrLen(intPart)
-
-    Loop, %len%
-    {
-        idx := len - A_Index + 1
-        digit := SubStr(intPart, idx, 1)
-        if (A_Index > 1 && Mod(A_Index - 1, 3) = 0)
-            out := "," . out
-        out := digit . out
-    }
-
-    return out
-}
-
-DebtOSD_UpdateLoop:
-    if (!DebtOSD_Visible)
-        return
-
-    elapsedWholeSeconds := DebtOSD_GetElapsedWholeSeconds()
-    if (elapsedWholeSeconds = DebtOSD_LastWholeSeconds)
-        return
-
-    DebtOSD_LastWholeSeconds := elapsedWholeSeconds
-    currentAmount := DebtOSD_GetCurrentAmount()
-    GuiControl, DebtOSD:, DebtOSD_Value, % DebtOSD_FormatAmount(currentAmount)
+    Timer_LastWholeSeconds := elapsedWholeSeconds
+    currentAmount := Timer_GetCurrentAmount()
+    GuiControl, TimerOSD:, TimerDisplayCtrl, % Timer_FormatAmount(currentAmount)
 return
 
 
