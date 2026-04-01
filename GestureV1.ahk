@@ -22,6 +22,23 @@ if (_cfgThreshold != "")
     MoveThreshold := _cfgThreshold
 
 VolOSD_Active := 0
+DebtOSD_Visible := 0
+DebtOSD_GuiHwnd := 0
+DebtOSD_BaseAmount := 0
+DebtOSD_DeltaPerSecond := 0
+DebtOSD_CurrencyPrefix := "$"
+DebtOSD_CurrencySuffix := ""
+DebtOSD_Decimals := 2
+DebtOSD_PosX := 50
+DebtOSD_PosY := 90
+DebtOSD_Width := 240
+DebtOSD_FontSize := 18
+DebtOSD_TextColor := "FF8080"
+DebtOSD_BackgroundColor := "1B1B1B"
+DebtOSD_LastWholeSeconds := -1
+DebtOSD_BaseTimestamp := A_Now
+
+DebtOSD_LoadConfig()
 
 ; Initialize mouse-button hotkeys based on current profile
 SetupMouseButtonHotkeys()
@@ -618,6 +635,189 @@ TimerReset() {
     SetTimer, TimerUpdateLoop, Off
     Log("Timer reset")
 }
+
+DebtOSDToggle() {
+    global DebtOSD_Visible
+
+    if (DebtOSD_Visible) {
+        DebtOSD_Hide()
+        Log("DebtOSD hidden")
+    } else {
+        DebtOSD_Show()
+        Log("DebtOSD shown")
+    }
+}
+
+DebtOSD_Show() {
+    global DebtOSD_GuiHwnd, DebtOSD_Visible, DebtOSD_PosX, DebtOSD_PosY, DebtOSD_Width
+    global DebtOSD_FontSize, DebtOSD_TextColor, DebtOSD_BackgroundColor
+    global DebtOSD_LastWholeSeconds
+
+    if (!DebtOSD_GuiHwnd) {
+        Gui, DebtOSD:New, +AlwaysOnTop +ToolWindow -Caption +HwndDebtOSD_GuiHwnd
+        Gui, DebtOSD:Color, %DebtOSD_BackgroundColor%
+        Gui, DebtOSD:Margin, 14, 10
+        Gui, DebtOSD:Font, s%DebtOSD_FontSize% w700 c%DebtOSD_TextColor%, Segoe UI
+        Gui, DebtOSD:Add, Text, vDebtOSD_Value Center w%DebtOSD_Width%, $0.00
+    }
+
+    DebtOSD_Visible := 1
+    DebtOSD_LastWholeSeconds := -1
+    GoSub, DebtOSD_UpdateLoop
+    Gui, DebtOSD:Show, NoActivate x%DebtOSD_PosX% y%DebtOSD_PosY%, DebtOSD
+    SetTimer, DebtOSD_UpdateLoop, 250
+}
+
+DebtOSD_Hide() {
+    global DebtOSD_Visible
+
+    Gui, DebtOSD:Hide
+    DebtOSD_Visible := 0
+    SetTimer, DebtOSD_UpdateLoop, Off
+}
+
+DebtOSD_LoadConfig() {
+    global DebtOSD_BaseAmount, DebtOSD_DeltaPerSecond, DebtOSD_CurrencyPrefix, DebtOSD_CurrencySuffix
+    global DebtOSD_Decimals, DebtOSD_PosX, DebtOSD_PosY, DebtOSD_Width, DebtOSD_FontSize
+    global DebtOSD_TextColor, DebtOSD_BackgroundColor, DebtOSD_BaseTimestamp
+
+    IniRead, DebtOSD_BaseAmount, %A_ScriptDir%\gesture_config.ini, DebtOSD, InitialAmount, 0
+    IniRead, DebtOSD_DeltaPerSecond, %A_ScriptDir%\gesture_config.ini, DebtOSD, DeltaPerSecond, 0
+    IniRead, DebtOSD_BaseTimestamp, %A_ScriptDir%\gesture_config.ini, DebtOSD, BaseTimestamp, %A_Now%
+    IniRead, DebtOSD_CurrencyPrefix, %A_ScriptDir%\gesture_config.ini, DebtOSD, CurrencyPrefix, $
+    IniRead, DebtOSD_CurrencySuffix, %A_ScriptDir%\gesture_config.ini, DebtOSD, CurrencySuffix,
+    IniRead, DebtOSD_Decimals, %A_ScriptDir%\gesture_config.ini, DebtOSD, Decimals, 2
+    IniRead, DebtOSD_PosX, %A_ScriptDir%\gesture_config.ini, DebtOSD, PosX, 50
+    IniRead, DebtOSD_PosY, %A_ScriptDir%\gesture_config.ini, DebtOSD, PosY, 90
+    IniRead, DebtOSD_Width, %A_ScriptDir%\gesture_config.ini, DebtOSD, Width, 240
+    IniRead, DebtOSD_FontSize, %A_ScriptDir%\gesture_config.ini, DebtOSD, FontSize, 18
+    IniRead, DebtOSD_TextColor, %A_ScriptDir%\gesture_config.ini, DebtOSD, TextColor, FF8080
+    IniRead, DebtOSD_BackgroundColor, %A_ScriptDir%\gesture_config.ini, DebtOSD, BackgroundColor, 1B1B1B
+
+    DebtOSD_BaseAmount += 0
+    DebtOSD_DeltaPerSecond += 0
+    DebtOSD_Decimals += 0
+    DebtOSD_PosX += 0
+    DebtOSD_PosY += 0
+    DebtOSD_Width += 0
+    DebtOSD_FontSize += 0
+    if (DebtOSD_BaseTimestamp = "")
+        DebtOSD_BaseTimestamp := A_Now
+}
+
+DebtOSDConfig() {
+    global DebtOSD_BaseAmount, DebtOSD_DeltaPerSecond, DebtOSD_CurrencyPrefix, DebtOSD_CurrencySuffix
+    global DebtOSD_Visible, DebtOSD_LastWholeSeconds, DebtOSD_BaseTimestamp
+
+    currentAmount := DebtOSD_GetCurrentAmount()
+
+    InputBox, newAmount, Debt OSD, Starting amount from right now:, , 360, 150,,,,, %currentAmount%
+    if (ErrorLevel)
+        return
+    if newAmount is not number
+    {
+        MsgBox, 48, DGlider, Starting amount must be numeric.
+        return
+    }
+
+    InputBox, newDelta, Debt OSD, Change per second:`nUse negative to count down., , 360, 170,,,,, %DebtOSD_DeltaPerSecond%
+    if (ErrorLevel)
+        return
+    if newDelta is not number
+    {
+        MsgBox, 48, DGlider, Change per second must be numeric.
+        return
+    }
+
+    InputBox, newPrefix, Debt OSD, Currency prefix (example: $):, , 360, 150,,,,, %DebtOSD_CurrencyPrefix%
+    if (ErrorLevel)
+        return
+
+    InputBox, newSuffix, Debt OSD, Currency suffix (optional):, , 360, 150,,,,, %DebtOSD_CurrencySuffix%
+    if (ErrorLevel)
+        return
+
+    DebtOSD_BaseAmount := newAmount + 0
+    DebtOSD_DeltaPerSecond := newDelta + 0
+    DebtOSD_CurrencyPrefix := newPrefix
+    DebtOSD_CurrencySuffix := newSuffix
+    DebtOSD_BaseTimestamp := A_Now
+    DebtOSD_LastWholeSeconds := -1
+
+    IniWrite, %DebtOSD_BaseAmount%, %A_ScriptDir%\gesture_config.ini, DebtOSD, InitialAmount
+    IniWrite, %DebtOSD_DeltaPerSecond%, %A_ScriptDir%\gesture_config.ini, DebtOSD, DeltaPerSecond
+    IniWrite, %DebtOSD_BaseTimestamp%, %A_ScriptDir%\gesture_config.ini, DebtOSD, BaseTimestamp
+    IniWrite, %DebtOSD_CurrencyPrefix%, %A_ScriptDir%\gesture_config.ini, DebtOSD, CurrencyPrefix
+    IniWrite, %DebtOSD_CurrencySuffix%, %A_ScriptDir%\gesture_config.ini, DebtOSD, CurrencySuffix
+
+    if (DebtOSD_Visible)
+        GoSub, DebtOSD_UpdateLoop
+
+    Log("DebtOSD config updated: amount=" DebtOSD_BaseAmount " delta=" DebtOSD_DeltaPerSecond)
+}
+
+DebtOSD_GetCurrentAmount() {
+    global DebtOSD_BaseAmount, DebtOSD_DeltaPerSecond
+
+    elapsedWholeSeconds := DebtOSD_GetElapsedWholeSeconds()
+    return DebtOSD_BaseAmount + (elapsedWholeSeconds * DebtOSD_DeltaPerSecond)
+}
+
+DebtOSD_GetElapsedWholeSeconds() {
+    global DebtOSD_BaseTimestamp
+
+    nowStamp := A_Now
+    EnvSub, nowStamp, %DebtOSD_BaseTimestamp%, Seconds
+    if nowStamp is not number
+        return 0
+    return Floor(nowStamp)
+}
+
+DebtOSD_FormatAmount(amount) {
+    global DebtOSD_CurrencyPrefix, DebtOSD_CurrencySuffix, DebtOSD_Decimals
+
+    sign := (amount < 0) ? "-" : ""
+    absValue := Abs(amount)
+    formattedAbs := Format("{:." DebtOSD_Decimals "f}", absValue)
+    dotPos := InStr(formattedAbs, ".")
+
+    if (dotPos > 0) {
+        intPart := SubStr(formattedAbs, 1, dotPos - 1)
+        fracPart := SubStr(formattedAbs, dotPos + 1)
+        return sign . DebtOSD_CurrencyPrefix . DebtOSD_AddThousandsSeparators(intPart) . "." . fracPart . DebtOSD_CurrencySuffix
+    }
+
+    return sign . DebtOSD_CurrencyPrefix . DebtOSD_AddThousandsSeparators(formattedAbs) . DebtOSD_CurrencySuffix
+}
+
+DebtOSD_AddThousandsSeparators(intPart) {
+    out := ""
+    len := StrLen(intPart)
+
+    Loop, %len%
+    {
+        idx := len - A_Index + 1
+        digit := SubStr(intPart, idx, 1)
+        if (A_Index > 1 && Mod(A_Index - 1, 3) = 0)
+            out := "," . out
+        out := digit . out
+    }
+
+    return out
+}
+
+DebtOSD_UpdateLoop:
+    if (!DebtOSD_Visible)
+        return
+
+    elapsedWholeSeconds := DebtOSD_GetElapsedWholeSeconds()
+    if (elapsedWholeSeconds = DebtOSD_LastWholeSeconds)
+        return
+
+    DebtOSD_LastWholeSeconds := elapsedWholeSeconds
+    currentAmount := DebtOSD_GetCurrentAmount()
+    GuiControl, DebtOSD:, DebtOSD_Value, % DebtOSD_FormatAmount(currentAmount)
+return
 
 
 ; ----------------------------------------------------------------------

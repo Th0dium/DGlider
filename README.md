@@ -89,15 +89,41 @@ Per‑Profile Disabled Hotkeys
 - `fn:TypeText` — prompt for text and type it raw.
 - `fn:SCI` — save clipboard image to `C:\EpsteinBackupDrive\SavedPictures\yyyy-MM-dd_HH-mm-ss.png`.
 - `fn:VolumeOSD` — show a simple volume OSD at the bottom‑left; use mouse wheel to adjust.
+- `fn:DebtOSDToggle` — show or hide a money OSD that changes once per second using the configured rate.
+- `fn:DebtOSDConfig` — prompt for the current amount and per-second change, then save them to `gesture_config.ini`.
 
 ## Volume OSD Notes
 
 - When the OSD opens, the script enables wheel handling immediately to avoid missing the first wheel tick.
 - The wheel hotkeys are active only while OSD is open; they won’t interfere otherwise.
 
+## Debt OSD Notes
+
+- The amount is calculated as `InitialAmount + elapsed_seconds * DeltaPerSecond`.
+- `BaseTimestamp` is the moment that `InitialAmount` started applying, so the value survives script reloads.
+- Use a positive `DeltaPerSecond` to count up and a negative value to count down.
+- Bind `fn:DebtOSDToggle` to any gesture to show/hide the overlay.
+- Bind `fn:DebtOSDConfig` if you want to update the amount/rate from a prompt instead of editing the INI.
+- Visual settings live under `[DebtOSD]` in `gesture_config.ini`:
+
+```
+[DebtOSD]
+InitialAmount=2500
+DeltaPerSecond=0.05
+BaseTimestamp=20260402000000
+CurrencyPrefix=$
+CurrencySuffix=
+Decimals=2
+PosX=50
+PosY=90
+Width=240
+FontSize=18
+TextColor=FF8080
+BackgroundColor=1B1B1B
+```
+
 ## Tips
 
 - Use `{}` for “no action” to keep INI fields explicit and avoid parse quirks.
 - You can assign mouse buttons and keyboard combos in the same profile.
 - Logs live at Desktop\Log\gesture_log.txt for troubleshooting.
-
