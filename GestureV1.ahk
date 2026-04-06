@@ -1,4 +1,4 @@
-﻿;------------------------------------- Traits -------------------------------------
+;------------------------------------- Traits -------------------------------------
 #NoEnv
 #SingleInstance Force
 SendMode, Input
@@ -22,24 +22,13 @@ if (_cfgThreshold != "")
     MoveThreshold := _cfgThreshold
 
 VolOSD_Active := 0
-Timer_Visible := 0
-Timer_GuiHwnd := 0
-Timer_BaseAmount := 0
-Timer_DeltaPerSecond := 0
-Timer_CurrencyPrefix := "$"
-Timer_CurrencySuffix := ""
-Timer_Decimals := 2
-Timer_PosX := 50
-Timer_PosY := 50
-Timer_Width := 240
-Timer_FontSize := 18
-Timer_TextColor := "FF8080"
-Timer_BackgroundColor := "1B1B1B"
-Timer_LastWholeSeconds := -1
-Timer_BaseTimestamp := A_Now
-TimerDisplayCtrl := ""
-
-Timer_LoadConfig()
+ProdTimer_Running := 0
+ProdTimer_TotalMs := 0
+ProdTimer_LastStartTick := 0
+ProdTimer_Visible := 0
+ProdTimer_HideTick := 0
+ProdTimer_GuiHwnd := 0
+ProdTimerDisplayCtrl := ""
 
 ; Initialize mouse-button hotkeys based on current profile
 SetupMouseButtonHotkeys()
@@ -58,6 +47,7 @@ SetupMouseButtonHotkeys()
 ^!7::HandleMouseAction("^!7")
 ^!8::HandleMouseAction("^!8")
 ^!9::HandleMouseAction("^!9")
+^!0::HandleMouseAction("^!0")
 
 ; Mouse button gestures (managed dynamically by profile)
 ; Bindings are set via SetupMouseButtonHotkeys/ApplyProfileHotkeys.
@@ -303,6 +293,132 @@ VolumeOSD_Wheel(dir) {
     GuiControl, OSDVol:, OSDBar, %newVal%
 }
 
+WorkTimerToggle() {
+    global ProdTimer_Running, ProdTimer_TotalMs, ProdTimer_LastStartTick
+    global ProdTimer_Visible
+
+    nowTick := A_TickCount
+
+    if (!ProdTimer_Visible) {
+        Log("Work timer OSD shown")
+        WorkTimer_ShowForDuration(3000)
+        return
+    }
+
+    if (ProdTimer_Running) {
+        ProdTimer_TotalMs += (nowTick - ProdTimer_LastStartTick)
+        ProdTimer_Running := 0
+        Log("Work timer paused at " WorkTimer_FormatElapsed(ProdTimer_TotalMs))
+    } else {
+        ProdTimer_LastStartTick := nowTick
+        ProdTimer_Running := 1
+        Log("Work timer started")
+    }
+
+    WorkTimer_ShowForDuration(3000)
+}
+
+WorkTimerShow() {
+    Log("Work timer OSD shown (show-only key)")
+    WorkTimer_ShowForDuration(3000)
+}
+
+WorkTimerShowAltTab() {
+    WorkTimerShow()
+    Send, !{Tab}
+    Log("Work timer OSD shown + AltTab")
+}
+
+WorkTimerReset() {
+    global ProdTimer_Running, ProdTimer_TotalMs, ProdTimer_LastStartTick, ProdTimer_Visible
+
+    ; Reset is allowed only when OSD is visible and timer is paused.
+    if (ProdTimer_Visible && !ProdTimer_Running) {
+        ProdTimer_Running := 0
+        ProdTimer_TotalMs := 0
+        ProdTimer_LastStartTick := 0
+        Log("Work timer reset")
+        WorkTimer_ShowForDuration(3000)
+        return
+    }
+
+    ; While running, this key acts as "-10 seconds".
+    if (!ProdTimer_Running) {
+        Log("Work timer reset skipped (OSD hidden or timer not running)")
+        return
+    }
+
+    currentMs := WorkTimer_GetElapsedMs()
+    newMs := currentMs - 10000
+    if (newMs < 0)
+        newMs := 0
+
+    ProdTimer_TotalMs := newMs
+    if (ProdTimer_Running)
+        ProdTimer_LastStartTick := A_TickCount
+    else
+        ProdTimer_LastStartTick := 0
+
+    Log("Work timer -10s -> " WorkTimer_FormatElapsed(newMs))
+    if (ProdTimer_Visible)
+        WorkTimer_ShowForDuration(3000)
+}
+
+WorkTimer_ShowForDuration(durationMs:=3000) {
+    global ProdTimer_GuiHwnd, ProdTimer_Visible, ProdTimer_HideTick, ProdTimerDisplayCtrl
+
+    if (!ProdTimer_GuiHwnd) {
+        Gui, ProdTimerOSD:New, +AlwaysOnTop +ToolWindow -Caption +HwndhProdTimer
+        ProdTimer_GuiHwnd := hProdTimer
+        Gui, ProdTimerOSD:Color, 1B1B1B
+        Gui, ProdTimerOSD:Margin, 14, 10
+        Gui, ProdTimerOSD:Font, s15 w700 c9CFFAA, Segoe UI
+        Gui, ProdTimerOSD:Add, Text, vProdTimerDisplayCtrl Center w340, Timer 00:00:00 [Paused]
+    }
+
+    ProdTimer_Visible := 1
+    ProdTimer_HideTick := A_TickCount + durationMs
+    GoSub, WorkTimerUpdateLoop
+    Gui, ProdTimerOSD:Show, NoActivate x50 y50, ProdTimerOSD
+    SetTimer, WorkTimerUpdateLoop, 100
+}
+
+WorkTimer_Hide() {
+    global ProdTimer_Visible
+
+    Gui, ProdTimerOSD:Hide
+    ProdTimer_Visible := 0
+    SetTimer, WorkTimerUpdateLoop, Off
+}
+
+WorkTimer_GetElapsedMs() {
+    global ProdTimer_Running, ProdTimer_TotalMs, ProdTimer_LastStartTick
+
+    if (ProdTimer_Running)
+        return ProdTimer_TotalMs + (A_TickCount - ProdTimer_LastStartTick)
+    return ProdTimer_TotalMs
+}
+
+WorkTimer_FormatElapsed(totalMs) {
+    totalSeconds := Floor(totalMs / 1000)
+    hours := Floor(totalSeconds / 3600)
+    minutes := Floor(Mod(totalSeconds, 3600) / 60)
+    seconds := Mod(totalSeconds, 60)
+    return Format("{:02}:{:02}:{:02}", hours, minutes, seconds)
+}
+
+WorkTimerUpdateLoop:
+    if (!ProdTimer_Visible)
+        return
+
+    elapsedMs := WorkTimer_GetElapsedMs()
+    state := ProdTimer_Running ? "Running" : "Paused"
+    GuiControl, ProdTimerOSD:, ProdTimerDisplayCtrl, % "Timer " WorkTimer_FormatElapsed(elapsedMs) " [" state "]"
+
+    if (A_TickCount >= ProdTimer_HideTick)
+        WorkTimer_Hide()
+return
+
 ; Screen rotation by timed mouse movement sample (no GUI).
 ScreenRotateOSD() {
     global MoveThreshold
@@ -512,233 +628,6 @@ ProfSelGuiClose:
     Gui, ProfSel:Destroy
 return
 
-    ;----------------------------------- Timer OSD Function -----------------------------------
-
-    TimerToggle() {
-        global Timer_Visible
-
-        if (Timer_Visible) {
-            Timer_Hide()
-            Log("Timer OSD hidden")
-        } else {
-            Timer_Show()
-            Log("Timer OSD shown")
-        }
-    }
-
-    Timer_Show() {
-        global Timer_GuiHwnd, Timer_Visible, Timer_PosX, Timer_PosY, Timer_Width
-        global Timer_FontSize, Timer_TextColor, Timer_BackgroundColor, Timer_LastWholeSeconds
-        global TimerDisplayCtrl
-
-        if (!Timer_GuiHwnd) {
-            timerDisplayOpts := "vTimerDisplayCtrl Center w" Timer_Width
-            Gui, TimerOSD:New, +AlwaysOnTop +ToolWindow -Caption +HwndTimer_GuiHwnd
-            Gui, TimerOSD:Color, %Timer_BackgroundColor%
-            Gui, TimerOSD:Margin, 14, 10
-            Gui, TimerOSD:Font, s%Timer_FontSize% w700 c%Timer_TextColor%, Segoe UI
-            Gui, TimerOSD:Add, Text, %timerDisplayOpts%, 0.00
-        }
-
-        Timer_Visible := 1
-        Timer_LastWholeSeconds := -1
-        GoSub, TimerUpdateLoop
-        Gui, TimerOSD:Show, NoActivate x%Timer_PosX% y%Timer_PosY%, TimerOSD
-        SetTimer, TimerUpdateLoop, 250
-    }
-
-    Timer_Hide() {
-        global Timer_Visible
-
-        Gui, TimerOSD:Hide
-        Timer_Visible := 0
-        SetTimer, TimerUpdateLoop, Off
-    }
-
-    Timer_LoadConfig() {
-        global Timer_BaseAmount, Timer_DeltaPerSecond, Timer_CurrencyPrefix, Timer_CurrencySuffix
-        global Timer_Decimals, Timer_PosX, Timer_PosY, Timer_Width, Timer_FontSize
-        global Timer_TextColor, Timer_BackgroundColor, Timer_BaseTimestamp
-
-        IniRead, Timer_BaseAmount, %A_ScriptDir%\gesture_config.ini, TimerOSD, InitialAmount, 0
-        IniRead, Timer_DeltaPerSecond, %A_ScriptDir%\gesture_config.ini, TimerOSD, DeltaPerSecond, 0
-        IniRead, Timer_BaseTimestamp, %A_ScriptDir%\gesture_config.ini, TimerOSD, BaseTimestamp, %A_Now%
-        IniRead, Timer_CurrencyPrefix, %A_ScriptDir%\gesture_config.ini, TimerOSD, CurrencyPrefix, $
-        IniRead, Timer_CurrencySuffix, %A_ScriptDir%\gesture_config.ini, TimerOSD, CurrencySuffix,
-        IniRead, Timer_Decimals, %A_ScriptDir%\gesture_config.ini, TimerOSD, Decimals, 2
-        IniRead, Timer_PosX, %A_ScriptDir%\gesture_config.ini, TimerOSD, PosX, 50
-        IniRead, Timer_PosY, %A_ScriptDir%\gesture_config.ini, TimerOSD, PosY, 50
-        IniRead, Timer_Width, %A_ScriptDir%\gesture_config.ini, TimerOSD, Width, 240
-        IniRead, Timer_FontSize, %A_ScriptDir%\gesture_config.ini, TimerOSD, FontSize, 18
-        IniRead, Timer_TextColor, %A_ScriptDir%\gesture_config.ini, TimerOSD, TextColor, FF8080
-        IniRead, Timer_BackgroundColor, %A_ScriptDir%\gesture_config.ini, TimerOSD, BackgroundColor, 1B1B1B
-
-        Timer_BaseAmount += 0
-        Timer_DeltaPerSecond += 0
-        Timer_Decimals += 0
-        Timer_PosX += 0
-        Timer_PosY += 0
-        Timer_Width += 0
-        Timer_FontSize += 0
-        Timer_BaseTimestamp := Timer_NormalizeTimestamp(Timer_BaseTimestamp)
-        if (Timer_BaseTimestamp = "")
-            Timer_BaseTimestamp := A_Now
-    }
-
-    TimerConfig() {
-        global Timer_BaseAmount, Timer_DeltaPerSecond, Timer_CurrencyPrefix, Timer_CurrencySuffix
-        global Timer_Visible, Timer_LastWholeSeconds, Timer_BaseTimestamp
-
-        currentAmount := Timer_GetCurrentAmount()
-
-        InputBox, newAmount, Timer OSD, Current amount from right now:, , 360, 150,,,,, %currentAmount%
-        if (ErrorLevel)
-            return
-        if newAmount is not number
-        {
-            MsgBox, 48, DGlider, Current amount must be numeric.
-            return
-        }
-
-        InputBox, newDelta, Timer OSD, Change per second:`nUse negative to count down., , 360, 170,,,,, %Timer_DeltaPerSecond%
-        if (ErrorLevel)
-            return
-        if newDelta is not number
-        {
-            MsgBox, 48, DGlider, Change per second must be numeric.
-            return
-        }
-
-        InputBox, newPrefix, Timer OSD, Currency prefix (example: $):, , 360, 150,,,,, %Timer_CurrencyPrefix%
-        if (ErrorLevel)
-            return
-
-        InputBox, newSuffix, Timer OSD, Currency suffix (optional):, , 360, 150,,,,, %Timer_CurrencySuffix%
-        if (ErrorLevel)
-            return
-
-        InputBox, newTimestamp, Timer OSD, Base timestamp:`nyyyyMMddHHmmss or yyyy-MM-dd HH:mm:ss`nLeave blank to use current time., , 420, 190,,,,, %Timer_BaseTimestamp%
-        if (ErrorLevel)
-            return
-
-        newTimestamp := Timer_NormalizeTimestamp(newTimestamp)
-        if (newTimestamp = "")
-        {
-            MsgBox, 48, DGlider, Base timestamp is invalid.`nUse yyyyMMddHHmmss or yyyy-MM-dd HH:mm:ss.
-            return
-        }
-
-        Timer_BaseAmount := newAmount + 0
-        Timer_DeltaPerSecond := newDelta + 0
-        Timer_CurrencyPrefix := newPrefix
-        Timer_CurrencySuffix := newSuffix
-        Timer_BaseTimestamp := newTimestamp
-        Timer_LastWholeSeconds := -1
-
-        IniWrite, %Timer_BaseAmount%, %A_ScriptDir%\gesture_config.ini, TimerOSD, InitialAmount
-        IniWrite, %Timer_DeltaPerSecond%, %A_ScriptDir%\gesture_config.ini, TimerOSD, DeltaPerSecond
-        IniWrite, %Timer_BaseTimestamp%, %A_ScriptDir%\gesture_config.ini, TimerOSD, BaseTimestamp
-        IniWrite, %Timer_CurrencyPrefix%, %A_ScriptDir%\gesture_config.ini, TimerOSD, CurrencyPrefix
-        IniWrite, %Timer_CurrencySuffix%, %A_ScriptDir%\gesture_config.ini, TimerOSD, CurrencySuffix
-
-        if (Timer_Visible)
-            GoSub, TimerUpdateLoop
-
-        Log("Timer OSD config updated: amount=" Timer_BaseAmount " delta=" Timer_DeltaPerSecond)
-    }
-
-    TimerReset() {
-        global Timer_BaseAmount, Timer_BaseTimestamp, Timer_LastWholeSeconds, Timer_Visible
-
-        Timer_BaseAmount := 0
-        Timer_BaseTimestamp := A_Now
-        Timer_LastWholeSeconds := -1
-        IniWrite, %Timer_BaseAmount%, %A_ScriptDir%\gesture_config.ini, TimerOSD, InitialAmount
-        IniWrite, %Timer_BaseTimestamp%, %A_ScriptDir%\gesture_config.ini, TimerOSD, BaseTimestamp
-        if (Timer_Visible)
-            GoSub, TimerUpdateLoop
-        Log("Timer OSD amount reset")
-    }
-
-    Timer_GetCurrentAmount() {
-        global Timer_BaseAmount, Timer_DeltaPerSecond
-
-        elapsedWholeSeconds := Timer_GetElapsedWholeSeconds()
-        return Timer_BaseAmount + (elapsedWholeSeconds * Timer_DeltaPerSecond)
-    }
-
-    Timer_GetElapsedWholeSeconds() {
-        global Timer_BaseTimestamp
-
-        nowStamp := A_Now
-        EnvSub, nowStamp, %Timer_BaseTimestamp%, Seconds
-        if nowStamp is not number
-            return 0
-        return Floor(nowStamp)
-    }
-
-    Timer_NormalizeTimestamp(ts) {
-        ts := Trim(ts)
-        if (ts = "")
-            return A_Now
-
-        if (SubStr(ts, 1, 14) = "BaseTimestamp=")
-            ts := SubStr(ts, 15)
-
-        ts := RegExReplace(ts, "[^\d]")
-        if (StrLen(ts) = 14)
-            return ts
-
-        return ""
-    }
-
-    Timer_FormatAmount(amount) {
-        global Timer_CurrencyPrefix, Timer_CurrencySuffix, Timer_Decimals
-
-        sign := (amount < 0) ? "-" : ""
-        absValue := Abs(amount)
-        formattedAbs := Format("{:." Timer_Decimals "f}", absValue)
-        dotPos := InStr(formattedAbs, ".")
-
-        if (dotPos > 0) {
-            intPart := SubStr(formattedAbs, 1, dotPos - 1)
-            fracPart := SubStr(formattedAbs, dotPos + 1)
-            return sign . Timer_CurrencyPrefix . Timer_AddThousandsSeparators(intPart) . "." . fracPart . Timer_CurrencySuffix
-        }
-
-        return sign . Timer_CurrencyPrefix . Timer_AddThousandsSeparators(formattedAbs) . Timer_CurrencySuffix
-    }
-
-    Timer_AddThousandsSeparators(intPart) {
-        out := ""
-        len := StrLen(intPart)
-
-        Loop, %len%
-        {
-            idx := len - A_Index + 1
-            digit := SubStr(intPart, idx, 1)
-            if (A_Index > 1 && Mod(A_Index - 1, 3) = 0)
-                out := "," . out
-            out := digit . out
-        }
-
-        return out
-    }
-
-TimerUpdateLoop:
-    if (!Timer_Visible)
-        return
-
-    elapsedWholeSeconds := Timer_GetElapsedWholeSeconds()
-    if (elapsedWholeSeconds = Timer_LastWholeSeconds)
-        return
-
-    Timer_LastWholeSeconds := elapsedWholeSeconds
-    currentAmount := Timer_GetCurrentAmount()
-    GuiControl, TimerOSD:, TimerDisplayCtrl, % Timer_FormatAmount(currentAmount)
-return
-
-
 ; ----------------------------------------------------------------------
 
 ; This is for my personal use, delete it if you want, This sections should be keep at the bottom
@@ -755,4 +644,5 @@ SC07D::Send, {Backspace}    ; Always send Ctrl+Backspace
 +SC07D::Send, {Backspace}  ; Always send Ctrl+Backspace
 
 SC073::Send, ^v             ; Fifth key = Ctrl+V
-+Space:: send _
+^Space:: send _
+
