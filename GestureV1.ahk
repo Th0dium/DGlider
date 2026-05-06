@@ -628,11 +628,122 @@ ProfSelGuiClose:
     Gui, ProfSel:Destroy
 return
 
+;------------------------------- Snippet Manager --------------------------------
+
+; SnippetRecord: copies current clipboard text into a named slot.
+; Trigger: ^!5 UP
+; Behavior: shows OSD, then waits for ONE key (suppressed, not typed),
+;           saves clipboard into snippets.ini under [Snippets] key=<char>.
+SnippetRecord() {
+    snippetFile := A_ScriptDir "\snippets.ini"
+
+    ; Grab clipboard BEFORE showing anything
+    clipText := Clipboard
+    if (clipText = "") {
+        TrayTip, DGlider Snippets, Clipboard is empty — nothing to record., 2000
+        Log("SnippetRecord: clipboard empty, aborted")
+        return
+    }
+
+    ; Show OSD prompt
+    Gui, SnipRec:Destroy
+    Gui, SnipRec:New, +AlwaysOnTop +ToolWindow -Caption
+    Gui, SnipRec:Font, s10 Bold, Segoe UI
+    Gui, SnipRec:Add, Text, cWhite, RECORD — press a key to bind:
+    Gui, SnipRec:Color, 1E6FC8
+    Gui, SnipRec:Show, AutoSize xCenter y50, DGlider Snippet Record
+
+    ; Capture one key, suppressed (V = suppress, L1 = 1 char, T3 = 3s timeout)
+    Input, pressedKey, V L1 T3
+    Gui, SnipRec:Destroy
+
+    if (pressedKey = "") {
+        Log("SnippetRecord: timed out or cancelled")
+        return
+    }
+
+    ; Save to snippets.ini
+    ; Newlines must be escaped as literal \n to survive IniWrite
+    safeText := StrReplace(clipText, "`n", "\n")
+    safeText := StrReplace(safeText, "`r", "")
+    IniWrite, %safeText%, %snippetFile%, Snippets, %pressedKey%
+
+    ; Preview: truncate long strings for the tooltip
+    preview := SubStr(clipText, 1, 40)
+    if (StrLen(clipText) > 40)
+        preview .= "..."
+    Log("SnippetRecord: saved key='" pressedKey "' text='" preview "'")
+}
+
+; SnippetPaste: pastes the snippet bound to a key into the active window.
+; Trigger: ^!5 DEFAULT
+; Behavior: shows OSD, waits for ONE key (suppressed), loads the snippet,
+;           sets clipboard = snippet, sends Ctrl+V, then restores clipboard.
+SnippetPaste() {
+    snippetFile := A_ScriptDir "\snippets.ini"
+
+    ; Show OSD prompt
+    Gui, SnipPaste:Destroy
+    Gui, SnipPaste:New, +AlwaysOnTop +ToolWindow -Caption
+    Gui, SnipPaste:Font, s10 Bold, Segoe UI
+    Gui, SnipPaste:Add, Text, cWhite, PASTE — press a key to paste:
+    Gui, SnipPaste:Color, 1E9F58
+    Gui, SnipPaste:Show, AutoSize xCenter y50, DGlider Snippet Paste
+
+    ; Capture one key, suppressed
+    Input, pressedKey, V L1 T3
+    Gui, SnipPaste:Destroy
+
+    if (pressedKey = "") {
+        Log("SnippetPaste: timed out or cancelled")
+        return
+    }
+
+    ; Load from snippets.ini
+    IniRead, safeText, %snippetFile%, Snippets, %pressedKey%, %A_Space%
+    safeText := Trim(safeText)
+
+    if (safeText = "" || safeText = "ERROR") {
+        Log("SnippetPaste: no entry for key='" pressedKey "'")
+        return
+    }
+
+    ; Unescape newlines
+    snippetText := StrReplace(safeText, "\n", "`n")
+
+    ; Backup current clipboard, paste snippet, then restore
+    oldClip := ClipboardAll
+    Clipboard := snippetText
+    ClipWait, 1
+    Send, ^v
+    Sleep, 150
+    Clipboard := oldClip
+    oldClip :=
+
+    preview := SubStr(snippetText, 1, 40)
+    if (StrLen(snippetText) > 40)
+        preview .= "..."
+    Log("SnippetPaste: pasted key='" pressedKey "' text='" preview "'")
+}
+
+; SnippetReset: deletes the snippets.ini file to clear all saved snippets.
+SnippetReset() {
+    snippetFile := A_ScriptDir "\snippets.ini"
+    if FileExist(snippetFile) {
+        FileDelete, %snippetFile%
+        TrayTip, DGlider Snippets, All snippets have been reset., 2000
+        Log("SnippetReset: deleted snippets.ini")
+    }
+}
+
+
 ; ----------------------------------------------------------------------
 
 ; This is for my personal use, delete it if you want, This sections should be keep at the bottom
 ; Japanese keyboard remappings
-SC07B::Send, {Space}        ; First key = Spacebar
+SC07B::SnippetPaste()
++SC07B::SnippetRecord()
+!#SC07B::SnippetReset()
 SC079::Send, {Space}        ; Second key = Spacebar
 
 SC070::Send, {Backspace}    ; Always send Ctrl+Backspace
@@ -643,6 +754,4 @@ SC070::Send, {Backspace}    ; Always send Ctrl+Backspace
 SC07D::Send, {Backspace}    ; Always send Ctrl+Backspace
 +SC07D::Send, {Backspace}  ; Always send Ctrl+Backspace
 
-SC073::Send, ^v             ; Fifth key = Ctrl+V
 ^Space:: send _
-
