@@ -22,6 +22,7 @@ if (_cfgThreshold != "")
     MoveThreshold := _cfgThreshold
 
 VolOSD_Active := 0
+VolOSD_Hwnd := 0
 ProdTimer_Running := 0
 ProdTimer_TotalMs := 0
 ProdTimer_LastStartTick := 0
@@ -69,6 +70,7 @@ XButton2::HandleMouseAction("{xbutton2}")
 #If (VolOSD_Active)
     WheelUp::VolumeOSD_Wheel(1)
     WheelDown::VolumeOSD_Wheel(-1)
+    ~LButton::VolumeOSD_CloseIfClickOutside()
 #If
 
 ;------------------------------- Gesture Dispatch --------------------------------
@@ -222,9 +224,8 @@ TypeText() {
 ; Show a simple Volume OSD at middle-left. Use mouse wheel to adjust volume.
 ; When activated, focus goes to the OSD; auto-closes when it loses focus.
 VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
-    global VolOSD_Active
+    global VolOSD_Active, VolOSD_Hwnd
     global OSDBar
-    static osdHwnd := 0
     static STEP := 1 ; Step volume change per wheel notch
     static PAD := 10 ; Left/Right padding of OSD
     static BAR_W := 200 ; Width of progress bar
@@ -232,16 +233,13 @@ VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
 
     ; Handle messages from OnMessage
     if (msg != "") {
-        if (hwnd != osdHwnd)
+        if (hwnd != VolOSD_Hwnd)
             return
         ; Mouse wheel is handled by global hotkeys when OSD is active
         ; Lose focus -> destroy OSD (WM_ACTIVATE: 0 = inactive)
         if (msg = 0x0006) {
-            if ((wParam & 0xFFFF) = 0) {
-                Gui, OSDVol:Destroy
-                osdHwnd := 0
-                VolOSD_Active := 0
-            }
+            if ((wParam & 0xFFFF) = 0)
+                VolumeOSD_Close("deactivated")
             return
         }
         return
@@ -252,9 +250,9 @@ VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
     if (curVol = "")
         curVol := 50
 
-    if (!osdHwnd) {
+    if (!VolOSD_Hwnd) {
         Gui, OSDVol:New, +AlwaysOnTop +ToolWindow -Caption +HwndhOSD
-        osdHwnd := hOSD
+        VolOSD_Hwnd := hOSD
         Gui, OSDVol:Margin, %PAD%, % PAD-2
         Gui, OSDVol:Font, s9
         Gui, OSDVol:Add, Progress, vOSDBar w%BAR_W% h%BAR_H% Range0-100, %curVol%
@@ -267,13 +265,45 @@ VolumeOSD(wParam:="", lParam:="", msg:="", hwnd:="") {
     VolOSD_Active := 1
 
     Gui, OSDVol:Show, Hide AutoSize
-    WinGetPos,,, w, h, ahk_id %osdHwnd%
+    WinGetPos,,, w, h, ahk_id %VolOSD_Hwnd%
     posX := 10
     posY := A_ScreenHeight - h - 10
     Gui, OSDVol:Show
-    WinMove, ahk_id %osdHwnd%,, %posX%, %posY%
-    WinActivate, ahk_id %osdHwnd%
+    WinMove, ahk_id %VolOSD_Hwnd%,, %posX%, %posY%
+    WinActivate, ahk_id %VolOSD_Hwnd%
     Log("VolumeOSD opened and activated at " curVol "%")
+}
+
+VolumeOSD_Close(reason:="") {
+    global VolOSD_Active, VolOSD_Hwnd
+
+    if (!VolOSD_Hwnd)
+        return
+
+    Gui, OSDVol:Destroy
+    VolOSD_Hwnd := 0
+    VolOSD_Active := 0
+
+    if (reason != "")
+        Log("VolumeOSD closed (" reason ")")
+}
+
+VolumeOSD_CloseIfClickOutside() {
+    global VolOSD_Active, VolOSD_Hwnd
+
+    if (!VolOSD_Active || !VolOSD_Hwnd)
+        return
+
+    MouseGetPos, mouseX, mouseY
+    WinGetPos, osdX, osdY, osdW, osdH, ahk_id %VolOSD_Hwnd%
+    if (ErrorLevel) {
+        VolumeOSD_Close("missing window")
+        return
+    }
+
+    isInside := (mouseX >= osdX && mouseX < osdX + osdW && mouseY >= osdY && mouseY < osdY + osdH)
+    if (!isInside)
+        VolumeOSD_Close("outside click")
 }
 
 VolumeOSD_Wheel(dir) {
