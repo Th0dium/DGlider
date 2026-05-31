@@ -34,9 +34,6 @@ ProdTimerDisplayCtrl := ""
 ; Initialize mouse-button hotkeys based on current profile
 SetupMouseButtonHotkeys()
 
-; Initialize dynamic mouse-button hotkeys based on current profile
-SetupMouseButtonHotkeys()
-
 ;--------------------------------- Key pickup ------------------------------------
 
 ^!1::HandleMouseAction("^!1")
@@ -167,9 +164,9 @@ HandleMouseAction(hotkey) {
     }
 }
 
-; Hotkey setup/toggle for mouse buttons (MButton/RButton) based on profile
+; Hotkey setup/toggle for mouse buttons based on profile.
 SetupMouseButtonHotkeys() {
-    ; Assign labels once, then toggle On/Off per profile
+    ; Assign labels once for dynamically-created mouse hotkeys, then toggle all mouse capture.
     Hotkey, MButton, MBUTTON_HOTKEY
     Hotkey, RButton, RBUTTON_HOTKEY
     ApplyProfileHotkeys()
@@ -177,12 +174,17 @@ SetupMouseButtonHotkeys() {
 
 ApplyProfileHotkeys() {
     global ActiveProfile
+
     if (ActiveProfile = "Off") {
         Hotkey, MButton, Off
         Hotkey, RButton, Off
+        Hotkey, XButton1, Off
+        Hotkey, XButton2, Off
     } else {
         Hotkey, MButton, On
         Hotkey, RButton, On
+        Hotkey, XButton1, On
+        Hotkey, XButton2, On
     }
 }
 
