@@ -662,18 +662,26 @@ return
 
 ;------------------------------- Snippet Manager --------------------------------
 
-; SnippetRecord: copies current clipboard text into a named slot.
+; SnippetRecord: copies selected text into a named slot.
 ; Trigger: ^!5 UP
-; Behavior: shows OSD, then waits for ONE key (suppressed, not typed),
-;           saves clipboard into snippets.ini under [Snippets] key=<char>.
+; Behavior: copies the current selection first, then shows OSD and waits for
+;           ONE key (suppressed, not typed), saving the copied text into
+;           snippets.ini under [Snippets] key=<char>.
 SnippetRecord() {
     snippetFile := A_ScriptDir "\snippets.ini"
 
-    ; Grab clipboard BEFORE showing anything
+    ; Copy the current selection before showing any prompt so the active
+    ; window keeps focus while Ctrl+C runs.
+    oldClip := ClipboardAll
+    Clipboard := ""
+    SendInput, ^c
+    ClipWait, 1
     clipText := Clipboard
+    Clipboard := oldClip
+    oldClip :=
     if (clipText = "") {
-        TrayTip, DGlider Snippets, Clipboard is empty — nothing to record., 2000
-        Log("SnippetRecord: clipboard empty, aborted")
+        TrayTip, DGlider Snippets, No selected text found., 2000
+        Log("SnippetRecord: no selected text, aborted")
         return
     }
 
