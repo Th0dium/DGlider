@@ -90,8 +90,8 @@ Per‑Profile Disabled Hotkeys
 - `fn:SCI` — save clipboard image to `C:\EpsteinBackupDrive\SavedPictures\yyyy-MM-dd_HH-mm-ss.png`.
 - `fn:VolumeOSD` — show a simple volume OSD at the bottom‑left; use mouse wheel to adjust.
 - `fn:WorkTimerToggle` — toggle work timer start/pause and show its OSD for 3 seconds.
-- `fn:WorkTimerShow` � show timer OSD for 3 seconds without changing timer state.
-- `fn:WorkTimerReset` � if OSD is visible and paused: reset to `00:00:00`; if timer is running: subtract 10 seconds (floor at `00:00:00`).
+- `fn:WorkTimerShow` — show timer OSD for 3 seconds without changing timer state.
+- `fn:WorkTimerReset` — if OSD is visible and paused: reset to `00:00:00`; if timer is running: subtract 10 seconds (floor at `00:00:00`).
 
 ## Volume OSD Notes
 
