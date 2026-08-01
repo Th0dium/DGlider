@@ -784,7 +784,7 @@ SnippetReset() {
 SC07B::SnippetPaste()
 +SC07B::SnippetRecord()
 !#SC07B::SnippetReset()
-SC079::Send, {Space}        ; Second key = Spacebar
+SC079::Send, {Backspace}        ; Second key = Spacebar
 
 SC070::Send, {Backspace}    ; Always send Ctrl+Backspace
 +SC070::Send, {Backspace}  ; Always send Ctrl+Backspace
